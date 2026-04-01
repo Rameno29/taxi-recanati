@@ -1,0 +1,26 @@
+version: "3.9"
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: taxi
+      POSTGRES_PASSWORD: taxi_dev_password
+      POSTGRES_DB: taxi_recanati
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  db-test:
+    image: postgis/postgis:16-3.4
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: taxi
+      POSTGRES_PASSWORD: taxi_test_password
+      POSTGRES_DB: taxi_recanati_test
+    tmpfs:
+      - /var/lib/postgresql/data
+
+volumes:
+  pgdata:
