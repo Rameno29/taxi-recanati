@@ -13,7 +13,7 @@ export async function listDrivers(status?: string) {
       "u.email",
       "u.phone"
     )
-    .orderBy("d.created_at", "desc");
+    .orderBy("u.created_at", "desc");
 
   if (status) {
     query = query.where("d.status", status);
@@ -281,9 +281,15 @@ export async function getAuditLog(filters: {
   const offset = (page - 1) * limit;
 
   let query = db("admin_actions as a")
-    .leftJoin("users as u", "a.admin_id", "u.id")
+    .leftJoin("users as u", "a.admin_user_id", "u.id")
     .select(
-      "a.*",
+      "a.id",
+      "a.admin_user_id",
+      "a.action_type",
+      "a.entity_type as target_type",
+      "a.entity_id as target_id",
+      "a.payload_json as details",
+      "a.created_at",
       "u.name as admin_name",
       "u.email as admin_email"
     );

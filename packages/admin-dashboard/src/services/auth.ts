@@ -1,7 +1,7 @@
 import { api, setToken } from "./api";
 
 export async function login(email: string, password: string) {
-  const res = await api.post("/api/auth/login", { email, password });
+  const res = await api.post("/api/auth/login/email", { email, password });
   if (!res.ok) {
     const err = await res.json();
     throw new Error(err.message || "Login failed");
