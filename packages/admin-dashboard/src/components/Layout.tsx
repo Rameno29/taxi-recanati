@@ -6,6 +6,8 @@ const NAV_ITEMS = [
   { to: "/rides", label: "Corse" },
   { to: "/drivers", label: "Autisti" },
   { to: "/map", label: "Mappa" },
+  { to: "/analytics", label: "Analytics" },
+  { to: "/audit", label: "Audit Log" },
 ];
 
 export default function Layout() {

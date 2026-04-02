@@ -133,6 +133,182 @@ export async function adminUpdateDriver(
 }
 
 /**
+ * Revenue analytics with daily/weekly/monthly breakdown.
+ */
+export async function getRevenueAnalytics(period: "week" | "month" | "year" = "month") {
+  const intervals: Record<string, string> = {
+    week: "7 days",
+    month: "30 days",
+    year: "365 days",
+  };
+
+  const interval = intervals[period];
+
+  // Daily revenue for the period
+  const dailyRevenue = await db("rides")
+    .where("status", "completed")
+    .whereRaw(`completed_at >= NOW() - INTERVAL '${interval}'`)
+    .select(
+      db.raw("DATE(completed_at) as date"),
+      db.raw("COUNT(*) as rides"),
+      db.raw("COALESCE(SUM(fare_final), 0) as revenue"),
+      db.raw("COALESCE(AVG(fare_final), 0) as avg_fare")
+    )
+    .groupByRaw("DATE(completed_at)")
+    .orderBy("date", "asc");
+
+  // Totals for the period
+  const [totals] = await db("rides")
+    .where("status", "completed")
+    .whereRaw(`completed_at >= NOW() - INTERVAL '${interval}'`)
+    .select(
+      db.raw("COUNT(*) as total_rides"),
+      db.raw("COALESCE(SUM(fare_final), 0) as total_revenue"),
+      db.raw("COALESCE(AVG(fare_final), 0) as avg_fare"),
+      db.raw("COALESCE(AVG(distance_meters), 0) as avg_distance"),
+      db.raw("COALESCE(AVG(duration_seconds), 0) as avg_duration")
+    );
+
+  // Rides by status for the period
+  const byStatus = await db("rides")
+    .whereRaw(`created_at >= NOW() - INTERVAL '${interval}'`)
+    .select("status", db.raw("COUNT(*) as count"))
+    .groupBy("status");
+
+  // Rides by vehicle type
+  const byVehicle = await db("rides")
+    .where("status", "completed")
+    .whereRaw(`completed_at >= NOW() - INTERVAL '${interval}'`)
+    .select("vehicle_type", db.raw("COUNT(*) as count"), db.raw("COALESCE(SUM(fare_final), 0) as revenue"))
+    .groupBy("vehicle_type");
+
+  // Peak hours
+  const peakHours = await db("rides")
+    .where("status", "completed")
+    .whereRaw(`completed_at >= NOW() - INTERVAL '${interval}'`)
+    .select(
+      db.raw("EXTRACT(HOUR FROM created_at)::int as hour"),
+      db.raw("COUNT(*) as rides")
+    )
+    .groupByRaw("EXTRACT(HOUR FROM created_at)")
+    .orderBy("rides", "desc")
+    .limit(24);
+
+  return {
+    period,
+    daily: dailyRevenue.map((d: any) => ({
+      date: d.date,
+      rides: Number(d.rides),
+      revenue: Number(Number(d.revenue).toFixed(2)),
+      avg_fare: Number(Number(d.avg_fare).toFixed(2)),
+    })),
+    totals: {
+      rides: Number(totals.total_rides),
+      revenue: Number(Number(totals.total_revenue).toFixed(2)),
+      avg_fare: Number(Number(totals.avg_fare).toFixed(2)),
+      avg_distance_km: Number((Number(totals.avg_distance) / 1000).toFixed(1)),
+      avg_duration_min: Number((Number(totals.avg_duration) / 60).toFixed(1)),
+    },
+    by_status: byStatus.reduce((acc: Record<string, number>, s: any) => {
+      acc[s.status] = Number(s.count);
+      return acc;
+    }, {}),
+    by_vehicle: byVehicle.map((v: any) => ({
+      vehicle_type: v.vehicle_type,
+      count: Number(v.count),
+      revenue: Number(Number(v.revenue).toFixed(2)),
+    })),
+    peak_hours: peakHours.map((h: any) => ({
+      hour: h.hour,
+      rides: Number(h.rides),
+    })),
+  };
+}
+
+/**
+ * Driver performance rankings.
+ */
+export async function getDriverPerformance(period: "week" | "month" | "year" = "month") {
+  const intervals: Record<string, string> = {
+    week: "7 days",
+    month: "30 days",
+    year: "365 days",
+  };
+  const interval = intervals[period];
+
+  const drivers = await db("rides as r")
+    .join("drivers as d", "r.driver_id", "d.id")
+    .join("users as u", "d.user_id", "u.id")
+    .where("r.status", "completed")
+    .whereRaw(`r.completed_at >= NOW() - INTERVAL '${interval}'`)
+    .select(
+      "d.id as driver_id",
+      "u.name",
+      "d.license_plate",
+      "d.vehicle_type",
+      db.raw("COUNT(*) as total_rides"),
+      db.raw("COALESCE(SUM(r.fare_final), 0) as total_revenue"),
+      db.raw("COALESCE(AVG(r.fare_final), 0) as avg_fare"),
+      db.raw("COALESCE(AVG(r.customer_rating), 0) as avg_rating"),
+      db.raw("COUNT(r.customer_rating) as rated_rides")
+    )
+    .groupBy("d.id", "u.name", "d.license_plate", "d.vehicle_type")
+    .orderBy("total_revenue", "desc");
+
+  return drivers.map((d: any) => ({
+    driver_id: d.driver_id,
+    name: d.name,
+    license_plate: d.license_plate,
+    vehicle_type: d.vehicle_type,
+    total_rides: Number(d.total_rides),
+    total_revenue: Number(Number(d.total_revenue).toFixed(2)),
+    avg_fare: Number(Number(d.avg_fare).toFixed(2)),
+    avg_rating: Number(Number(d.avg_rating).toFixed(1)),
+    rated_rides: Number(d.rated_rides),
+  }));
+}
+
+/**
+ * Get audit log (admin actions).
+ */
+export async function getAuditLog(filters: {
+  page?: number;
+  limit?: number;
+  action_type?: string;
+}) {
+  const page = filters.page || 1;
+  const limit = filters.limit || 50;
+  const offset = (page - 1) * limit;
+
+  let query = db("admin_actions as a")
+    .leftJoin("users as u", "a.admin_id", "u.id")
+    .select(
+      "a.*",
+      "u.name as admin_name",
+      "u.email as admin_email"
+    );
+
+  if (filters.action_type) {
+    query = query.where("a.action_type", filters.action_type);
+  }
+
+  const countQuery = query.clone();
+  const [{ count }] = await countQuery.clearSelect().count("* as count");
+
+  const actions = await query
+    .orderBy("a.created_at", "desc")
+    .limit(limit)
+    .offset(offset);
+
+  return {
+    actions,
+    total: Number(count),
+    page,
+    totalPages: Math.ceil(Number(count) / limit),
+  };
+}
+
+/**
  * Get all active driver positions for the admin map.
  */
 export async function getDriverPositions() {

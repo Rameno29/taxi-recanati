@@ -98,4 +98,40 @@ router.post("/rides/:id/refund", async (req: Request, res: Response, next: NextF
   }
 });
 
+/** GET /api/admin/analytics/revenue — revenue analytics */
+router.get("/analytics/revenue", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const period = (req.query.period as "week" | "month" | "year") || "month";
+    const result = await adminService.getRevenueAnalytics(period);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** GET /api/admin/analytics/drivers — driver performance */
+router.get("/analytics/drivers", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const period = (req.query.period as "week" | "month" | "year") || "month";
+    const result = await adminService.getDriverPerformance(period);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** GET /api/admin/audit — audit log */
+router.get("/audit", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await adminService.getAuditLog({
+      page: req.query.page ? Number(req.query.page) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
+      action_type: req.query.action_type as string | undefined,
+    });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;
