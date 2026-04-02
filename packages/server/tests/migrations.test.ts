@@ -18,7 +18,7 @@ describe("Database migrations", () => {
 
     const [batchNo, migrations] = await db.migrate.latest();
     expect(batchNo).toBe(1);
-    expect(migrations.length).toBe(14);
+    expect(migrations.length).toBe(15);
   });
 
   test("all 14 tables exist after migration", async () => {

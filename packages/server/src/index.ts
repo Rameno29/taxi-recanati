@@ -6,6 +6,7 @@ import { config } from "./config";
 import { errorHandler } from "./middleware/errorHandler";
 import { apiLimiter } from "./middleware/rateLimiter";
 import authRoutes from "./routes/auth";
+import rideRoutes from "./routes/rides";
 
 const app = express();
 const httpServer = createServer(app);
@@ -20,6 +21,7 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/rides", rideRoutes);
 
 app.use(errorHandler);
 
