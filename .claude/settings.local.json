@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx turbo:*)",
+      "Bash(npx knex:*)",
+      "Bash(npx tsx:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker compose:*)",
+      "Bash(npx jest:*)",
+      "Bash(npm run:*)",
+      "Bash(npx expo:*)",
+      "Bash(npx create-expo-app@latest customer-app --template blank-typescript)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx create-expo-app@latest driver-app --template blank-typescript)",
+      "Bash(gh pr:*)"
+    ]
+  }
+}
