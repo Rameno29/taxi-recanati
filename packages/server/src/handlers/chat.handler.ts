@@ -1,6 +1,7 @@
 import { Server } from "socket.io";
 import db from "../db";
 import type { AuthenticatedSocket } from "../socket";
+import * as notifications from "../services/notification.service";
 
 interface ChatMessageData {
   ride_id: string;
@@ -59,6 +60,20 @@ export function registerChatHandler(io: Server) {
 
         // Also notify admin
         io.to("admin").emit("chat:message", payload);
+
+        // Push notification to the other participant
+        const recipientId = isCustomer
+          ? (ride.driver_id ? (await db("drivers").where("id", ride.driver_id).first())?.user_id : null)
+          : ride.customer_id;
+
+        if (recipientId) {
+          notifications
+            .sendToUser(recipientId, sender?.name || "Messaggio", message.body, {
+              type: "chat_message",
+              rideId: data.ride_id,
+            })
+            .catch(() => {});
+        }
       } catch (err) {
         socket.emit("error", { message: "Failed to send message" });
       }

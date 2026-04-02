@@ -1,0 +1,24 @@
+import React from "react";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { AuthProvider } from "./src/context/AuthContext";
+import { DriverProvider } from "./src/context/DriverContext";
+import AppNavigator from "./src/navigation/AppNavigator";
+import { usePushNotifications } from "./src/services/notifications";
+import "./src/i18n";
+
+function AppInner() {
+  usePushNotifications();
+  return <AppNavigator />;
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AuthProvider>
+        <DriverProvider>
+          <AppInner />
+        </DriverProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
+  );
+}
