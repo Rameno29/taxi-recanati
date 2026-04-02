@@ -15,3 +15,8 @@ export const earningsQuerySchema = z.object({
   from: z.string().datetime().optional(),
   to: z.string().datetime().optional(),
 });
+
+export const createDriverProfileSchema = z.object({
+  license_plate: z.string().min(2).max(20),
+  vehicle_type: z.enum(["standard", "premium", "van"]),
+});
