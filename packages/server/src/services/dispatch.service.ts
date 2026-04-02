@@ -1,6 +1,7 @@
 import db from "../db";
 import type { DriverRow } from "../types/db";
 import { AppError } from "../middleware/errorHandler";
+import { sendRideRequest } from "../handlers/ride.handler";
 
 interface NearestDriver extends DriverRow {
   distance_meters: number;
@@ -72,7 +73,7 @@ export async function attemptDispatch(
 
 /**
  * Auto-dispatch: find nearest drivers and create the first dispatch attempt.
- * Socket.io timeout/retry will be wired in Plan 3.
+ * Sends ride:request to the driver via Socket.io.
  */
 export async function runAutoDispatch(rideId: string) {
   const ride = await db("rides").where("id", rideId).first();
@@ -86,6 +87,20 @@ export async function runAutoDispatch(rideId: string) {
   if (drivers.length === 0) return null;
 
   const attempt = await attemptDispatch(rideId, drivers[0].id, 1, "system");
+
+  // Send ride request to driver via Socket.io
+  sendRideRequest(drivers[0].id, {
+    ride_id: rideId,
+    pickup_lat: ride.pickup_lat,
+    pickup_lng: ride.pickup_lng,
+    pickup_address: ride.pickup_address,
+    destination_lat: ride.destination_lat,
+    destination_lng: ride.destination_lng,
+    destination_address: ride.destination_address,
+    fare_estimate: ride.fare_estimate,
+    vehicle_type: ride.vehicle_type,
+  });
+
   return { attempt, driver: drivers[0] };
 }
 

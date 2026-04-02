@@ -14,6 +14,7 @@ import {
   checkFixedRoute,
 } from "./pricing.service";
 import { runAutoDispatch } from "./dispatch.service";
+import { broadcastRideStatus } from "../handlers/ride.handler";
 
 // Approximate distance using Haversine formula (for estimates without Google Maps API)
 function haversineDistance(
@@ -209,6 +210,9 @@ export async function updateRideStatus(
       changed_by_user_id: userId,
       changed_by_system: false,
     });
+
+    // Broadcast status change via Socket.io
+    broadcastRideStatus(rideId, currentStatus, newStatus);
 
     return updatedRide;
   });

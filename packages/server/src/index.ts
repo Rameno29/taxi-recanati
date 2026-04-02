@@ -7,9 +7,22 @@ import { errorHandler } from "./middleware/errorHandler";
 import { apiLimiter } from "./middleware/rateLimiter";
 import authRoutes from "./routes/auth";
 import rideRoutes from "./routes/rides";
+import messageRoutes from "./routes/messages";
+import driverRoutes from "./routes/drivers";
+import { initializeSocket } from "./socket";
+import { registerLocationHandler } from "./handlers/location.handler";
+import { registerChatHandler } from "./handlers/chat.handler";
 
 const app = express();
 const httpServer = createServer(app);
+
+// Initialize Socket.io (skip in test to avoid port conflicts)
+let io;
+if (process.env.NODE_ENV !== "test") {
+  io = initializeSocket(httpServer);
+  registerLocationHandler(io);
+  registerChatHandler(io);
+}
 
 app.use(helmet());
 app.use(cors());
@@ -22,6 +35,8 @@ app.get("/health", (_req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/rides", rideRoutes);
+app.use("/api/messages", messageRoutes);
+app.use("/api/drivers", driverRoutes);
 
 app.use(errorHandler);
 
@@ -31,4 +46,4 @@ if (process.env.NODE_ENV !== "test") {
   });
 }
 
-export { app, httpServer };
+export { app, httpServer, io };
