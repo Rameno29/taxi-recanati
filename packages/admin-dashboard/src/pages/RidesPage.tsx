@@ -56,6 +56,20 @@ export default function RidesPage() {
     }
   };
 
+  const handleRefund = async (rideId: string) => {
+    const amount = prompt("Importo rimborso in centesimi (vuoto = rimborso totale):");
+    if (amount === null) return; // cancelled
+    const body = amount ? { amount: Number(amount) } : {};
+    const res = await api.post(`/api/admin/rides/${rideId}/refund`, body);
+    if (res.ok) {
+      alert("Rimborso effettuato");
+      fetchRides();
+    } else {
+      const err = await res.json();
+      alert(`Errore: ${err.message}`);
+    }
+  };
+
   const openDispatch = async (rideId: string) => {
     setDispatchRideId(rideId);
     const res = await api.get("/api/admin/drivers?status=available");
@@ -144,10 +158,18 @@ export default function RidesPage() {
               <td style={{ fontWeight: "bold" }}>
                 €{Number(r.fare_final || r.fare_estimate).toFixed(2)}
               </td>
-              <td>
+              <td style={{ display: "flex", gap: 4 }}>
                 {r.status === "pending" && !r.driver_name && (
                   <button style={styles.actionBtn} onClick={() => openDispatch(r.id)}>
                     Assegna
+                  </button>
+                )}
+                {r.status === "completed" && (
+                  <button
+                    style={{ ...styles.actionBtn, background: "#F44336" }}
+                    onClick={() => handleRefund(r.id)}
+                  >
+                    Rimborso
                   </button>
                 )}
               </td>

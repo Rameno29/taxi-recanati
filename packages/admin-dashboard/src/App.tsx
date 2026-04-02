@@ -6,6 +6,8 @@ import DashboardPage from "./pages/DashboardPage";
 import RidesPage from "./pages/RidesPage";
 import DriversPage from "./pages/DriversPage";
 import MapPage from "./pages/MapPage";
+import AnalyticsPage from "./pages/AnalyticsPage";
+import AuditPage from "./pages/AuditPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return getToken() ? <>{children}</> : <Navigate to="/login" replace />;
@@ -27,6 +29,8 @@ export default function App() {
           <Route path="/rides" element={<RidesPage />} />
           <Route path="/drivers" element={<DriversPage />} />
           <Route path="/map" element={<MapPage />} />
+          <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route path="/audit" element={<AuditPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
