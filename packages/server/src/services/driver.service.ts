@@ -3,6 +3,41 @@ import { AppError } from "../middleware/errorHandler";
 import type { DriverStatus } from "../types/db";
 
 /**
+ * Create a driver profile for a user.
+ */
+export async function createDriverProfile(
+  userId: string,
+  licensePlate: string,
+  vehicleType: string
+) {
+  const existing = await db("drivers").where("user_id", userId).first();
+  if (existing) throw new AppError(409, "Driver profile already exists");
+
+  const user = await db("users").where("id", userId).first();
+  if (!user) throw new AppError(404, "User not found");
+
+  const [driver] = await db("drivers")
+    .insert({
+      user_id: userId,
+      license_plate: licensePlate,
+      vehicle_type: vehicleType,
+      status: "offline",
+    })
+    .returning("*");
+
+  return driver;
+}
+
+/**
+ * Get driver profile by user ID.
+ */
+export async function getDriverProfile(userId: string) {
+  const driver = await db("drivers").where("user_id", userId).first();
+  if (!driver) throw new AppError(404, "Driver profile not found");
+  return driver;
+}
+
+/**
  * Update a driver's availability status.
  */
 export async function updateDriverStatus(userId: string, status: DriverStatus) {

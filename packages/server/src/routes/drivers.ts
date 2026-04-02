@@ -1,13 +1,47 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { authenticate } from "../middleware/auth";
 import { requireRole } from "../middleware/requireRole";
-import { updateStatusSchema, pushLocationSchema } from "../validators/driver.validators";
+import { updateStatusSchema, pushLocationSchema, createDriverProfileSchema } from "../validators/driver.validators";
 import * as driverService from "../services/driver.service";
 import { AppError } from "../middleware/errorHandler";
 
 const router = Router();
 
 router.use(authenticate);
+
+/** POST /api/drivers/profile — create driver profile */
+router.post("/profile", requireRole("driver", "admin"), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = createDriverProfileSchema.parse(req.body);
+    const driver = await driverService.createDriverProfile(
+      req.user!.userId,
+      data.license_plate,
+      data.vehicle_type
+    );
+    res.status(201).json(driver);
+  } catch (err) {
+    if (err instanceof AppError) return next(err);
+    if ((err as any).name === "ZodError") {
+      return res.status(400).json({
+        error: "ValidationError",
+        message: (err as any).errors[0].message,
+        statusCode: 400,
+      });
+    }
+    next(err);
+  }
+});
+
+/** GET /api/drivers/me — get own driver profile */
+router.get("/me", requireRole("driver", "admin"), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const driver = await driverService.getDriverProfile(req.user!.userId);
+    res.json(driver);
+  } catch (err) {
+    if (err instanceof AppError) return next(err);
+    next(err);
+  }
+});
 
 /** PATCH /api/drivers/status — update own availability status */
 router.patch("/status", requireRole("driver"), async (req: Request, res: Response, next: NextFunction) => {
