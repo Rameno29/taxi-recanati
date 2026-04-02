@@ -11,6 +11,7 @@ import messageRoutes from "./routes/messages";
 import driverRoutes from "./routes/drivers";
 import paymentRoutes from "./routes/payments";
 import adminRoutes from "./routes/admin";
+import notificationRoutes from "./routes/notifications";
 import { initializeSocket } from "./socket";
 import { registerLocationHandler } from "./handlers/location.handler";
 import { registerChatHandler } from "./handlers/chat.handler";
@@ -48,6 +49,7 @@ app.use("/api/messages", messageRoutes);
 app.use("/api/drivers", driverRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 app.use(errorHandler);
 

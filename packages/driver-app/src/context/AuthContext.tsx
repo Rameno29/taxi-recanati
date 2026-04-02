@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import type { User } from "../types";
 import { api, storeTokens, clearTokens, getStoredTokens } from "../services/api";
 import { connectSocket, disconnectSocket } from "../services/socket";
+import { unregisterPushToken } from "../services/notifications";
 
 interface AuthState {
   user: User | null;
@@ -96,6 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
+      await unregisterPushToken();
       // Go offline before logging out
       await api.patch("/api/drivers/status", { status: "offline" });
       await api.post("/api/auth/logout");
