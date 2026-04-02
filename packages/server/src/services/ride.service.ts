@@ -15,6 +15,7 @@ import {
 } from "./pricing.service";
 import { runAutoDispatch } from "./dispatch.service";
 import { broadcastRideStatus } from "../handlers/ride.handler";
+import { capturePayment } from "./payment.service";
 
 // Approximate distance using Haversine formula (for estimates without Google Maps API)
 function haversineDistance(
@@ -213,6 +214,15 @@ export async function updateRideStatus(
 
     // Broadcast status change via Socket.io
     broadcastRideStatus(rideId, currentStatus, newStatus);
+
+    // Auto-capture payment on ride completion (best-effort)
+    if (newStatus === "completed") {
+      try {
+        await capturePayment(rideId);
+      } catch {
+        // Payment capture failed — can be retried manually
+      }
+    }
 
     return updatedRide;
   });
