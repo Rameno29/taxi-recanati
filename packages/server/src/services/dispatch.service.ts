@@ -3,7 +3,7 @@ import type { DriverRow } from "../types/db";
 import { AppError } from "../middleware/errorHandler";
 import { sendRideRequest } from "../handlers/ride.handler";
 
-interface NearestDriver extends DriverRow {
+export interface NearestDriver extends DriverRow {
   distance_meters: number;
 }
 
