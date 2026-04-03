@@ -8,8 +8,8 @@ import {
   RefreshControl,
   ScrollView,
 } from "react-native";
-import MapView, { Marker } from "react-native-maps";
 import { useTranslation } from "react-i18next";
+import MapPlaceholder from "../components/MapPlaceholder";
 import { useFocusEffect } from "@react-navigation/native";
 import { api } from "../services/api";
 import { getSocket } from "../services/socket";
@@ -150,34 +150,14 @@ export default function TrackingScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       {showMap && (
-        <MapView
+        <MapPlaceholder
           style={styles.map}
-          initialRegion={{
-            latitude: ride.pickup_lat,
-            longitude: ride.pickup_lng,
-            latitudeDelta: 0.02,
-            longitudeDelta: 0.02,
-          }}
-          showsUserLocation
-        >
-          <Marker
-            coordinate={{ latitude: ride.pickup_lat, longitude: ride.pickup_lng }}
-            pinColor="green"
-            title={t("home.pickup")}
-          />
-          <Marker
-            coordinate={{ latitude: ride.destination_lat, longitude: ride.destination_lng }}
-            pinColor="red"
-            title={t("home.destination")}
-          />
-          {driverLocation && (
-            <Marker
-              coordinate={driverLocation}
-              pinColor="blue"
-              title={t("ride.driver")}
-            />
-          )}
-        </MapView>
+          markers={[
+            { latitude: Number(ride.pickup_lat), longitude: Number(ride.pickup_lng), color: "green", title: t("home.pickup") },
+            { latitude: Number(ride.destination_lat), longitude: Number(ride.destination_lng), color: "red", title: t("home.destination") },
+            ...(driverLocation ? [{ ...driverLocation, color: "blue", title: t("ride.driver") }] : []),
+          ]}
+        />
       )}
 
       <View style={styles.infoPanel}>
@@ -195,7 +175,7 @@ export default function TrackingScreen({ navigation }: Props) {
         )}
 
         <Text style={styles.fareText}>
-          {t("ride.fare")}: €{(ride.fare_final || ride.fare_estimate).toFixed(2)}
+          {t("ride.fare")}: €{Number(ride.fare_final || ride.fare_estimate).toFixed(2)}
         </Text>
 
         <View style={styles.actions}>

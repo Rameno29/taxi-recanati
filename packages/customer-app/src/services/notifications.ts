@@ -2,66 +2,62 @@ import { useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
-import Constants from "expo-constants";
 import { api } from "./api";
 
 // Configure how notifications are presented when app is in foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
-  }),
+  } as any),
 });
 
 /**
  * Register for push notifications and send token to backend.
  */
 export async function registerForPushNotifications() {
-  if (!Device.isDevice) {
-    console.log("Push notifications require a physical device");
-    return null;
-  }
+  try {
+    if (!Device.isDevice) {
+      console.log("Push notifications require a physical device");
+      return null;
+    }
 
-  // Check existing permissions
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  let finalStatus = existingStatus;
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
 
-  if (existingStatus !== "granted") {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-  }
+    if (existingStatus !== "granted") {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
 
-  if (finalStatus !== "granted") {
-    return null;
-  }
+    if (finalStatus !== "granted") {
+      return null;
+    }
 
-  // Android notification channel
-  if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("default", {
-      name: "default",
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
+    // Android notification channel
+    if (Platform.OS === "android") {
+      await Notifications.setNotificationChannelAsync("default", {
+        name: "default",
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+      });
+    }
+
+    // Get Expo push token — requires EAS projectId in production
+    const tokenData = await Notifications.getExpoPushTokenAsync();
+    const token = tokenData.data;
+
+    await api.post("/api/notifications/register", {
+      token,
+      platform: Platform.OS as "ios" | "android",
     });
+
+    return token;
+  } catch (err) {
+    console.log("Push notification registration skipped:", err);
+    return null;
   }
-
-  // Get Expo push token
-  const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-  const tokenData = await Notifications.getExpoPushTokenAsync({
-    projectId,
-  });
-
-  const token = tokenData.data;
-
-  // Register with backend
-  await api.post("/api/notifications/register", {
-    token,
-    platform: Platform.OS as "ios" | "android",
-  });
-
-  return token;
 }
 
 /**
@@ -69,10 +65,7 @@ export async function registerForPushNotifications() {
  */
 export async function unregisterPushToken() {
   try {
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-    const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId,
-    });
+    const tokenData = await Notifications.getExpoPushTokenAsync();
     await api.post("/api/notifications/unregister", { token: tokenData.data });
   } catch {
     // Best effort
@@ -90,7 +83,7 @@ export function usePushNotifications(
   const responseListener = useRef<{ remove(): void } | null>(null);
 
   useEffect(() => {
-    registerForPushNotifications().catch(console.error);
+    registerForPushNotifications().catch(() => {});
 
     notificationListener.current = Notifications.addNotificationReceivedListener(
       (notification: Notifications.Notification) => {

@@ -27,8 +27,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const res = await api.get("/api/auth/me");
           if (res.ok) {
             const data = await res.json();
-            setUser(data.user);
-            await connectSocket();
+            // /api/auth/me returns user directly, not wrapped
+            setUser(data.user || data);
+            await connectSocket().catch(() => {});
           } else {
             await clearTokens();
           }
@@ -42,7 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const res = await api.post("/api/auth/login", { email, password });
+    const res = await api.post("/api/auth/login/email", { email, password });
     if (!res.ok) {
       const err = await res.json();
       throw new Error(err.message || "Login failed");
@@ -50,7 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const data = await res.json();
     await storeTokens(data.accessToken, data.refreshToken);
     setUser(data.user);
-    await connectSocket();
+    connectSocket().catch(() => {});
   };
 
   const register = async (name: string, email: string, phone: string, password: string) => {
@@ -68,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const data = await res.json();
     await storeTokens(data.accessToken, data.refreshToken);
     setUser(data.user);
-    await connectSocket();
+    connectSocket().catch(() => {});
   };
 
   const logout = async () => {

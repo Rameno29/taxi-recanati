@@ -57,10 +57,10 @@ export default function HistoryScreen() {
         </View>
 
         <Text style={styles.address} numberOfLines={1}>
-          📍 {item.pickup_address || `${item.pickup_lat.toFixed(4)}, ${item.pickup_lng.toFixed(4)}`}
+          📍 {item.pickup_address || `${Number(item.pickup_lat).toFixed(4)}, ${Number(item.pickup_lng).toFixed(4)}`}
         </Text>
         <Text style={styles.address} numberOfLines={1}>
-          🏁 {item.destination_address || `${item.destination_lat.toFixed(4)}, ${item.destination_lng.toFixed(4)}`}
+          🏁 {item.destination_address || `${Number(item.destination_lat).toFixed(4)}, ${Number(item.destination_lng).toFixed(4)}`}
         </Text>
 
         <Text style={styles.fare}>€{Number(fare).toFixed(2)}</Text>

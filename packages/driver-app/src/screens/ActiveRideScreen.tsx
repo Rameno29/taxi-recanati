@@ -9,8 +9,8 @@ import {
   RefreshControl,
   Linking,
 } from "react-native";
-import MapView, { Marker } from "react-native-maps";
 import { useTranslation } from "react-i18next";
+import MapPlaceholder from "../components/MapPlaceholder";
 import { useFocusEffect } from "@react-navigation/native";
 import { useDriver } from "../context/DriverContext";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
@@ -117,33 +117,13 @@ export default function ActiveRideScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      <MapView
+      <MapPlaceholder
         style={styles.map}
-        initialRegion={{
-          latitude: activeRide.pickup_lat,
-          longitude: activeRide.pickup_lng,
-          latitudeDelta: 0.02,
-          longitudeDelta: 0.02,
-        }}
-        showsUserLocation
-      >
-        <Marker
-          coordinate={{
-            latitude: activeRide.pickup_lat,
-            longitude: activeRide.pickup_lng,
-          }}
-          pinColor="green"
-          title={t("dashboard.pickup")}
-        />
-        <Marker
-          coordinate={{
-            latitude: activeRide.destination_lat,
-            longitude: activeRide.destination_lng,
-          }}
-          pinColor="red"
-          title={t("dashboard.destination")}
-        />
-      </MapView>
+        markers={[
+          { latitude: Number(activeRide.pickup_lat), longitude: Number(activeRide.pickup_lng), color: "green", title: t("dashboard.pickup") },
+          { latitude: Number(activeRide.destination_lat), longitude: Number(activeRide.destination_lng), color: "red", title: t("dashboard.destination") },
+        ]}
+      />
 
       <View style={styles.panel}>
         {/* Customer info */}

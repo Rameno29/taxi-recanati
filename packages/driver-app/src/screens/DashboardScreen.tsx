@@ -6,8 +6,8 @@ import {
   StyleSheet,
   Alert,
 } from "react-native";
-import MapView, { Marker } from "react-native-maps";
 import { useTranslation } from "react-i18next";
+import MapPlaceholder from "../components/MapPlaceholder";
 import { useDriver } from "../context/DriverContext";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { MainTabParamList } from "../navigation/AppNavigator";
@@ -70,11 +70,7 @@ export default function DashboardScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      <MapView
-        style={styles.map}
-        initialRegion={RECANATI}
-        showsUserLocation
-      />
+      <MapPlaceholder style={styles.map} />
 
       {/* Online/Offline toggle */}
       <View style={styles.toggleContainer}>
@@ -105,7 +101,7 @@ export default function DashboardScreen({ navigation }: Props) {
             <Text style={styles.requestLabel}>{t("dashboard.pickup")}:</Text>
             <Text style={styles.requestValue} numberOfLines={1}>
               {incomingRequest.pickup_address ||
-                `${incomingRequest.pickup_lat.toFixed(4)}, ${incomingRequest.pickup_lng.toFixed(4)}`}
+                `${Number(incomingRequest.pickup_lat).toFixed(4)}, ${Number(incomingRequest.pickup_lng).toFixed(4)}`}
             </Text>
           </View>
 
@@ -113,7 +109,7 @@ export default function DashboardScreen({ navigation }: Props) {
             <Text style={styles.requestLabel}>{t("dashboard.destination")}:</Text>
             <Text style={styles.requestValue} numberOfLines={1}>
               {incomingRequest.destination_address ||
-                `${incomingRequest.destination_lat.toFixed(4)}, ${incomingRequest.destination_lng.toFixed(4)}`}
+                `${Number(incomingRequest.destination_lat).toFixed(4)}, ${Number(incomingRequest.destination_lng).toFixed(4)}`}
             </Text>
           </View>
 
@@ -127,7 +123,7 @@ export default function DashboardScreen({ navigation }: Props) {
           <View style={styles.requestRow}>
             <Text style={styles.requestLabel}>{t("dashboard.distance")}:</Text>
             <Text style={styles.requestValue}>
-              {(incomingRequest.distance_meters / 1000).toFixed(1)} km
+              {(Number(incomingRequest.distance_meters) / 1000).toFixed(1)} km
             </Text>
           </View>
 

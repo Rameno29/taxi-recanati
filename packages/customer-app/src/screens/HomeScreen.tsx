@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,8 +8,8 @@ import {
   Alert,
   ScrollView,
 } from "react-native";
-import MapView, { Marker, Region } from "react-native-maps";
 import * as ExpoLocation from "expo-location";
+import MapPlaceholder from "../components/MapPlaceholder";
 import { useTranslation } from "react-i18next";
 import { api } from "../services/api";
 import type { Location } from "../types";
@@ -31,8 +31,6 @@ type RideType = "immediate" | "reservation";
 
 export default function HomeScreen({ navigation }: Props) {
   const { t } = useTranslation();
-  const mapRef = useRef<MapView>(null);
-
   const [userLocation, setUserLocation] = useState<Location | null>(null);
   const [pickup, setPickup] = useState<Location | null>(null);
   const [destination, setDestination] = useState<Location | null>(null);
@@ -116,28 +114,14 @@ export default function HomeScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      <MapView
-        ref={mapRef}
+      <MapPlaceholder
         style={styles.map}
-        initialRegion={userLocation ? { ...userLocation, latitudeDelta: 0.02, longitudeDelta: 0.02 } : RECANATI}
         onPress={handleMapPress}
-        showsUserLocation
-      >
-        {pickup && (
-          <Marker
-            coordinate={pickup}
-            pinColor="green"
-            title={t("home.pickup")}
-          />
-        )}
-        {destination && (
-          <Marker
-            coordinate={destination}
-            pinColor="red"
-            title={t("home.destination")}
-          />
-        )}
-      </MapView>
+        markers={[
+          ...(pickup ? [{ ...pickup, color: "green", title: t("home.pickup") }] : []),
+          ...(destination ? [{ ...destination, color: "red", title: t("home.destination") }] : []),
+        ]}
+      />
 
       <View style={styles.panel}>
         <Text style={styles.hint}>
@@ -183,7 +167,7 @@ export default function HomeScreen({ navigation }: Props) {
 
         {fareEstimate !== null && (
           <Text style={styles.fare}>
-            {t("home.estimatedFare")}: €{fareEstimate.toFixed(2)}
+            {t("home.estimatedFare")}: €{Number(fareEstimate).toFixed(2)}
           </Text>
         )}
 
