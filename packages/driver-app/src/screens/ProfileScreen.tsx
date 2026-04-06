@@ -10,6 +10,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useDriver } from "../context/DriverContext";
+import { persistLanguage } from "../i18n";
 import { colors, spacing, radii, fonts } from "../theme";
 
 export default function ProfileScreen() {
@@ -20,6 +21,7 @@ export default function ProfileScreen() {
   const toggleLanguage = () => {
     const newLang = i18n.language === "it" ? "en" : "it";
     i18n.changeLanguage(newLang);
+    persistLanguage(newLang);
   };
 
   const handleLogout = () => {

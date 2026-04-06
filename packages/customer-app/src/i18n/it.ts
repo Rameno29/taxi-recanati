@@ -79,6 +79,12 @@ export default {
     history: "Storico",
     profile: "Profilo",
   },
+  payment: {
+    initializing: "Preparazione pagamento...",
+    retry: "Riprova",
+    cancelledTitle: "Pagamento annullato",
+    cancelledMessage: "Puoi completare il pagamento in seguito.",
+  },
   profile: {
     title: "Profilo",
     language: "Lingua",
