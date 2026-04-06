@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
-import MapPlaceholder from "../components/MapPlaceholder";
+import LiveMap from "../components/LiveMap";
 import { useDriver } from "../context/DriverContext";
 import { colors, spacing, radii, fonts } from "../theme";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
@@ -74,7 +74,7 @@ export default function DashboardScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      <MapPlaceholder style={styles.map} />
+      <LiveMap style={styles.map} initialRegion={RECANATI} showUserLocation />
 
       {/* Online/Offline toggle */}
       <View style={styles.toggleContainer}>

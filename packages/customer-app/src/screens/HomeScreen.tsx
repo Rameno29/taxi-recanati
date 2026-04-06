@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import * as ExpoLocation from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
-import MapPlaceholder from "../components/MapPlaceholder";
+import LiveMap from "../components/LiveMap";
 import { useTranslation } from "react-i18next";
 import { api } from "../services/api";
 import { colors, spacing, radii, shadows } from "../theme";
@@ -122,12 +122,18 @@ export default function HomeScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      <MapPlaceholder
+      <LiveMap
         style={styles.map}
+        initialRegion={RECANATI}
+        showUserLocation
         onPress={handleMapPress}
         markers={[
-          ...(pickup ? [{ ...pickup, color: "green", title: t("home.pickup") }] : []),
-          ...(destination ? [{ ...destination, color: "red", title: t("home.destination") }] : []),
+          ...(pickup
+            ? [{ coordinate: pickup, color: "green", title: t("home.pickup") }]
+            : []),
+          ...(destination
+            ? [{ coordinate: destination, color: "red", title: t("home.destination") }]
+            : []),
         ]}
       />
 

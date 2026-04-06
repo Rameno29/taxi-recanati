@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
-import MapPlaceholder from "../components/MapPlaceholder";
+import LiveMap from "../components/LiveMap";
 import { useFocusEffect } from "@react-navigation/native";
 import { api } from "../services/api";
 import { getSocket } from "../services/socket";
@@ -164,13 +164,21 @@ export default function TrackingScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       {showMap && (
-        <MapPlaceholder
+        <LiveMap
           style={styles.map}
           markers={[
-            { latitude: Number(ride.pickup_lat), longitude: Number(ride.pickup_lng), color: "green", title: t("home.pickup") },
-            { latitude: Number(ride.destination_lat), longitude: Number(ride.destination_lng), color: "red", title: t("home.destination") },
-            ...(driverLocation ? [{ ...driverLocation, color: "blue", title: t("ride.driver") }] : []),
+            {
+              coordinate: { latitude: Number(ride.pickup_lat), longitude: Number(ride.pickup_lng) },
+              color: "green",
+              title: t("home.pickup"),
+            },
+            {
+              coordinate: { latitude: Number(ride.destination_lat), longitude: Number(ride.destination_lng) },
+              color: "red",
+              title: t("home.destination"),
+            },
           ]}
+          driverLocation={driverLocation}
         />
       )}
 

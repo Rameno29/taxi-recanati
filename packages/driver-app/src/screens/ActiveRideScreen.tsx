@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
-import MapPlaceholder from "../components/MapPlaceholder";
+import LiveMap from "../components/LiveMap";
 import { useFocusEffect } from "@react-navigation/native";
 import { useDriver } from "../context/DriverContext";
 import { colors, spacing, radii, fonts } from "../theme";
@@ -119,11 +119,20 @@ export default function ActiveRideScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      <MapPlaceholder
+      <LiveMap
         style={styles.map}
+        showUserLocation
         markers={[
-          { latitude: Number(activeRide.pickup_lat), longitude: Number(activeRide.pickup_lng), color: "green", title: t("dashboard.pickup") },
-          { latitude: Number(activeRide.destination_lat), longitude: Number(activeRide.destination_lng), color: "red", title: t("dashboard.destination") },
+          {
+            coordinate: { latitude: Number(activeRide.pickup_lat), longitude: Number(activeRide.pickup_lng) },
+            color: "green",
+            title: t("dashboard.pickup"),
+          },
+          {
+            coordinate: { latitude: Number(activeRide.destination_lat), longitude: Number(activeRide.destination_lng) },
+            color: "red",
+            title: t("dashboard.destination"),
+          },
         ]}
       />
 
