@@ -9,10 +9,12 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { api } from "../services/api";
 import { getSocket } from "../services/socket";
 import { useAuth } from "../context/AuthContext";
+import { colors, spacing, radii } from "../theme";
 import type { Message } from "../types";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/AppNavigator";
@@ -79,7 +81,7 @@ export default function ChatScreen({ route }: Props) {
         <Text style={[styles.bubbleText, isMine && styles.bubbleTextMine]}>
           {item.body}
         </Text>
-        <Text style={styles.time}>
+        <Text style={[styles.time, isMine && styles.timeMine]}>
           {new Date(item.created_at).toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
@@ -106,6 +108,7 @@ export default function ChatScreen({ route }: Props) {
         }
         ListEmptyComponent={
           <View style={styles.empty}>
+            <Ionicons name="chatbubbles-outline" size={56} color={colors.border} />
             <Text style={styles.emptyText}>{t("chat.empty")}</Text>
           </View>
         }
@@ -117,6 +120,7 @@ export default function ChatScreen({ route }: Props) {
           value={text}
           onChangeText={setText}
           placeholder={t("chat.placeholder")}
+          placeholderTextColor={colors.bodyText}
           multiline
           maxLength={500}
         />
@@ -124,8 +128,9 @@ export default function ChatScreen({ route }: Props) {
           style={[styles.sendBtn, !text.trim() && styles.sendBtnDisabled]}
           onPress={sendMessage}
           disabled={!text.trim()}
+          activeOpacity={0.7}
         >
-          <Text style={styles.sendText}>{t("chat.send")}</Text>
+          <Ionicons name="send" size={20} color={colors.white} />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -133,54 +138,63 @@ export default function ChatScreen({ route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f5f5f5" },
-  list: { padding: 16, flexGrow: 1 },
-  empty: { flex: 1, justifyContent: "center", alignItems: "center" },
-  emptyText: { color: "#999", fontSize: 16 },
+  container: { flex: 1, backgroundColor: colors.lightBg },
+  list: { padding: spacing.md, flexGrow: 1 },
+  empty: { flex: 1, justifyContent: "center", alignItems: "center", gap: spacing.sm },
+  emptyText: { color: colors.bodyText, fontSize: 16 },
   bubble: {
     maxWidth: "80%",
-    padding: 12,
-    borderRadius: 16,
-    marginBottom: 8,
+    padding: spacing.md,
+    borderRadius: radii.lg,
+    marginBottom: spacing.sm,
   },
   bubbleMine: {
-    backgroundColor: "#FFC107",
+    backgroundColor: colors.primaryBlue,
     alignSelf: "flex-end",
     borderBottomRightRadius: 4,
   },
   bubbleTheirs: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.white,
     alignSelf: "flex-start",
     borderBottomLeftRadius: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  bubbleText: { fontSize: 16, color: "#333" },
-  bubbleTextMine: { color: "#000" },
-  time: { fontSize: 11, color: "#999", marginTop: 4, alignSelf: "flex-end" },
+  bubbleText: { fontSize: 16, color: colors.dark },
+  bubbleTextMine: { color: colors.white },
+  time: { fontSize: 11, color: colors.bodyText, marginTop: 4, alignSelf: "flex-end" },
+  timeMine: { color: "rgba(255,255,255,0.7)" },
   inputBar: {
     flexDirection: "row",
-    padding: 12,
-    backgroundColor: "#fff",
+    padding: spacing.md,
+    backgroundColor: colors.white,
     borderTopWidth: 1,
-    borderTopColor: "#eee",
+    borderTopColor: colors.border,
     alignItems: "flex-end",
   },
   input: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 20,
-    paddingHorizontal: 16,
+    borderColor: colors.border,
+    borderRadius: radii.xl,
+    paddingHorizontal: spacing.md,
     paddingVertical: 10,
     fontSize: 16,
     maxHeight: 100,
+    color: colors.dark,
+    backgroundColor: colors.lightBg,
   },
   sendBtn: {
-    backgroundColor: "#FFC107",
-    borderRadius: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    marginLeft: 8,
+    backgroundColor: colors.primaryBlue,
+    borderRadius: radii.full,
+    width: 44,
+    height: 44,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: spacing.sm,
   },
-  sendBtnDisabled: { opacity: 0.5 },
-  sendText: { fontWeight: "bold", fontSize: 16 },
+  sendBtnDisabled: { opacity: 0.4 },
 });

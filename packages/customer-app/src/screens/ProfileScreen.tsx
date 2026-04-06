@@ -6,8 +6,10 @@ import {
   StyleSheet,
   Alert,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
+import { colors, spacing, radii, shadows } from "../theme";
 
 export default function ProfileScreen() {
   const { t, i18n } = useTranslation();
@@ -43,15 +45,22 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
-        <TouchableOpacity style={styles.row} onPress={toggleLanguage}>
-          <Text style={styles.rowLabel}>{t("profile.language")}</Text>
-          <Text style={styles.rowValue}>
-            {i18n.language === "it" ? t("profile.italian") : t("profile.english")}
-          </Text>
+        <TouchableOpacity style={styles.row} onPress={toggleLanguage} activeOpacity={0.6}>
+          <View style={styles.rowLeft}>
+            <Ionicons name="language-outline" size={22} color={colors.primaryBlue} />
+            <Text style={styles.rowLabel}>{t("profile.language")}</Text>
+          </View>
+          <View style={styles.rowRight}>
+            <Text style={styles.rowValue}>
+              {i18n.language === "it" ? t("profile.italian") : t("profile.english")}
+            </Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.bodyText} />
+          </View>
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+      <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
+        <Ionicons name="log-out-outline" size={20} color={colors.white} style={{ marginRight: 8 }} />
         <Text style={styles.logoutText}>{t("auth.logout")}</Text>
       </TouchableOpacity>
     </View>
@@ -59,54 +68,68 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f5f5f5", padding: 16 },
+  container: { flex: 1, backgroundColor: colors.lightBg, padding: spacing.md },
   userCard: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 24,
+    backgroundColor: colors.white,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
     alignItems: "center",
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    marginBottom: spacing.md,
+    ...shadows.card,
   },
   avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: "#FFC107",
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.primaryBlue,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: spacing.md,
+    shadowColor: colors.primaryBlue,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  avatarText: { fontSize: 28, fontWeight: "bold", color: "#000" },
-  name: { fontSize: 20, fontWeight: "bold", color: "#333" },
-  email: { fontSize: 14, color: "#666", marginTop: 4 },
-  phone: { fontSize: 14, color: "#666", marginTop: 2 },
+  avatarText: { fontSize: 32, fontWeight: "bold", color: colors.white },
+  name: { fontSize: 22, fontWeight: "bold", color: colors.dark },
+  email: { fontSize: 14, color: colors.bodyText, marginTop: spacing.xs },
+  phone: { fontSize: 14, color: colors.bodyText, marginTop: 2 },
   section: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    marginBottom: 16,
+    backgroundColor: colors.white,
+    borderRadius: radii.md,
+    marginBottom: spacing.md,
     overflow: "hidden",
+    ...shadows.card,
   },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 16,
+    padding: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    borderBottomColor: colors.border,
   },
-  rowLabel: { fontSize: 16, color: "#333" },
-  rowValue: { fontSize: 16, color: "#666" },
+  rowLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  rowRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  rowLabel: { fontSize: 16, color: colors.dark },
+  rowValue: { fontSize: 16, color: colors.bodyText },
   logoutBtn: {
-    backgroundColor: "#F44336",
-    borderRadius: 12,
+    backgroundColor: colors.error,
+    borderRadius: radii.md,
     padding: 16,
     alignItems: "center",
-    marginTop: 16,
+    flexDirection: "row",
+    justifyContent: "center",
+    marginTop: spacing.md,
   },
-  logoutText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  logoutText: { color: colors.white, fontWeight: "bold", fontSize: 16 },
 });

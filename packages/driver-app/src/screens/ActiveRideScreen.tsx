@@ -9,19 +9,21 @@ import {
   RefreshControl,
   Linking,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import MapPlaceholder from "../components/MapPlaceholder";
 import { useFocusEffect } from "@react-navigation/native";
 import { useDriver } from "../context/DriverContext";
+import { colors, spacing, radii, fonts } from "../theme";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { MainTabParamList } from "../navigation/AppNavigator";
 
 type Props = BottomTabScreenProps<MainTabParamList, "ActiveRide">;
 
-const STATUS_FLOW: Record<string, { next: string; label: string; color: string }> = {
-  accepted: { next: "arriving", label: "ride.markArriving", color: "#9C27B0" },
-  arriving: { next: "in_progress", label: "ride.startRide", color: "#2196F3" },
-  in_progress: { next: "completed", label: "ride.completeRide", color: "#4CAF50" },
+const STATUS_FLOW: Record<string, { next: string; label: string; color: string; icon: keyof typeof Ionicons.glyphMap }> = {
+  accepted: { next: "arriving", label: "ride.markArriving", color: "#4357AD", icon: "navigate" },
+  arriving: { next: "in_progress", label: "ride.startRide", color: "#4357AD", icon: "play-circle" },
+  in_progress: { next: "completed", label: "ride.completeRide", color: "#1B5E20", icon: "checkmark-circle" },
 };
 
 export default function ActiveRideScreen({ navigation }: Props) {
@@ -73,7 +75,6 @@ export default function ActiveRideScreen({ navigation }: Props) {
 
   const openNavigation = () => {
     if (!activeRide) return;
-    // Open in device maps app
     const lat = activeRide.status === "accepted" || activeRide.status === "arriving"
       ? activeRide.pickup_lat
       : activeRide.destination_lat;
@@ -106,6 +107,7 @@ export default function ActiveRideScreen({ navigation }: Props) {
           <RefreshControl refreshing={false} onRefresh={refreshActiveRide} />
         }
       >
+        <Ionicons name="car-sport-outline" size={64} color={colors.border} />
         <Text style={styles.emptyText}>{t("ride.noActiveRide")}</Text>
       </ScrollView>
     );
@@ -128,7 +130,10 @@ export default function ActiveRideScreen({ navigation }: Props) {
       <View style={styles.panel}>
         {/* Customer info */}
         <View style={styles.customerRow}>
-          <View>
+          <View style={styles.customerAvatar}>
+            <Ionicons name="person" size={22} color={colors.white} />
+          </View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.customerName}>
               {activeRide.customer_name || t("ride.customer")}
             </Text>
@@ -143,15 +148,18 @@ export default function ActiveRideScreen({ navigation }: Props) {
 
         {/* Quick actions row */}
         <View style={styles.quickActions}>
-          <TouchableOpacity style={styles.quickBtn} onPress={openNavigation}>
+          <TouchableOpacity style={styles.quickBtn} onPress={openNavigation} activeOpacity={0.7}>
+            <Ionicons name="navigate-outline" size={22} color={colors.primaryBlue} />
             <Text style={styles.quickBtnText}>{t("ride.navigate")}</Text>
           </TouchableOpacity>
           {activeRide.customer_phone && (
-            <TouchableOpacity style={styles.quickBtn} onPress={callCustomer}>
+            <TouchableOpacity style={styles.quickBtn} onPress={callCustomer} activeOpacity={0.7}>
+              <Ionicons name="call-outline" size={22} color={colors.primaryBlue} />
               <Text style={styles.quickBtnText}>{t("ride.callCustomer")}</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={styles.quickBtn} onPress={openChat}>
+          <TouchableOpacity style={styles.quickBtn} onPress={openChat} activeOpacity={0.7}>
+            <Ionicons name="chatbubble-outline" size={22} color={colors.primaryBlue} />
             <Text style={styles.quickBtnText}>{t("ride.chat")}</Text>
           </TouchableOpacity>
         </View>
@@ -161,7 +169,9 @@ export default function ActiveRideScreen({ navigation }: Props) {
           <TouchableOpacity
             style={[styles.mainAction, { backgroundColor: flow.color }]}
             onPress={handleNextStatus}
+            activeOpacity={0.8}
           >
+            <Ionicons name={flow.icon as any} size={24} color={colors.white} style={{ marginRight: 8 }} />
             <Text style={styles.mainActionText}>{t(flow.label as any)}</Text>
           </TouchableOpacity>
         )}
@@ -169,12 +179,14 @@ export default function ActiveRideScreen({ navigation }: Props) {
         {/* Secondary actions */}
         <View style={styles.secondaryActions}>
           {showNoShow && (
-            <TouchableOpacity style={styles.noShowBtn} onPress={handleNoShow}>
+            <TouchableOpacity style={styles.noShowBtn} onPress={handleNoShow} activeOpacity={0.8}>
+              <Ionicons name="eye-off-outline" size={18} color={colors.white} style={{ marginRight: 6 }} />
               <Text style={styles.noShowBtnText}>{t("ride.reportNoShow")}</Text>
             </TouchableOpacity>
           )}
           {canCancel && (
-            <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel} activeOpacity={0.8}>
+              <Ionicons name="close-circle-outline" size={18} color={colors.white} style={{ marginRight: 6 }} />
               <Text style={styles.cancelBtnText}>{t("ride.cancelRide")}</Text>
             </TouchableOpacity>
           )}
@@ -186,14 +198,14 @@ export default function ActiveRideScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  emptyText: { fontSize: 16, color: "#999" },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", gap: spacing.md },
+  emptyText: { fontSize: fonts.body, color: colors.bodyText },
   map: { flex: 1 },
   panel: {
-    backgroundColor: "#fff",
-    padding: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: colors.white,
+    padding: spacing.lg,
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
@@ -202,51 +214,71 @@ const styles = StyleSheet.create({
   },
   customerRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: spacing.md,
+    gap: spacing.md,
   },
-  customerName: { fontSize: 18, fontWeight: "bold", color: "#333" },
-  statusLabel: { fontSize: 14, color: "#666", marginTop: 2 },
-  fare: { fontSize: 24, fontWeight: "bold", color: "#1B5E20" },
+  customerAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primaryBlue,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  customerName: { fontSize: 18, fontWeight: "bold", color: colors.dark },
+  statusLabel: { fontSize: fonts.label, color: colors.bodyText, marginTop: 2 },
+  fare: { fontSize: 24, fontWeight: "bold", color: colors.primaryBlue },
   quickActions: {
     flexDirection: "row",
-    gap: 8,
-    marginBottom: 16,
+    gap: spacing.sm,
+    marginBottom: spacing.md,
   },
   quickBtn: {
     flex: 1,
-    backgroundColor: "#f0f0f0",
-    padding: 10,
-    borderRadius: 8,
+    backgroundColor: colors.primaryBlueLight,
+    paddingVertical: spacing.md,
+    borderRadius: radii.md,
     alignItems: "center",
+    gap: 4,
   },
-  quickBtnText: { fontSize: 12, fontWeight: "600", color: "#333" },
+  quickBtnText: { fontSize: fonts.caption, fontWeight: "600", color: colors.primaryBlue },
   mainAction: {
-    padding: 16,
-    borderRadius: 12,
+    flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,
+    justifyContent: "center",
+    padding: spacing.md,
+    borderRadius: radii.md,
+    marginBottom: spacing.md,
+    shadowColor: colors.primaryBlue,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  mainActionText: { color: "#fff", fontWeight: "bold", fontSize: 18 },
+  mainActionText: { color: colors.white, fontWeight: "bold", fontSize: 18 },
   secondaryActions: {
     flexDirection: "row",
-    gap: 12,
+    gap: spacing.md,
   },
   noShowBtn: {
     flex: 1,
-    backgroundColor: "#FF9800",
-    padding: 12,
-    borderRadius: 10,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.warning,
+    padding: spacing.md,
+    borderRadius: radii.sm,
   },
-  noShowBtnText: { color: "#fff", fontWeight: "bold", fontSize: 14 },
+  noShowBtnText: { color: colors.white, fontWeight: "bold", fontSize: fonts.label },
   cancelBtn: {
     flex: 1,
-    backgroundColor: "#F44336",
-    padding: 12,
-    borderRadius: 10,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.error,
+    padding: spacing.md,
+    borderRadius: radii.sm,
   },
-  cancelBtnText: { color: "#fff", fontWeight: "bold", fontSize: 14 },
+  cancelBtnText: { color: colors.white, fontWeight: "bold", fontSize: fonts.label },
 });

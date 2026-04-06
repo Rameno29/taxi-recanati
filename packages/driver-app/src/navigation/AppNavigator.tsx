@@ -3,8 +3,10 @@ import { ActivityIndicator, View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
+import { colors } from "../theme";
 
 import LoginScreen from "../screens/LoginScreen";
 import RegisterScreen from "../screens/RegisterScreen";
@@ -35,17 +37,37 @@ const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const MainTab = createBottomTabNavigator<MainTabParamList>();
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 
+const TAB_ICONS: Record<string, { focused: keyof typeof Ionicons.glyphMap; unfocused: keyof typeof Ionicons.glyphMap }> = {
+  Dashboard: { focused: "car-sport", unfocused: "car-sport-outline" },
+  ActiveRide: { focused: "navigate", unfocused: "navigate-outline" },
+  Earnings: { focused: "cash", unfocused: "cash-outline" },
+  Profile: { focused: "person", unfocused: "person-outline" },
+};
+
 function MainTabs() {
   const { t } = useTranslation();
 
   return (
     <MainTab.Navigator
-      screenOptions={{
-        headerStyle: { backgroundColor: "#1B5E20" },
-        headerTintColor: "#fff",
-        tabBarActiveTintColor: "#1B5E20",
-        tabBarInactiveTintColor: "#888",
-      }}
+      screenOptions={({ route }) => ({
+        headerStyle: { backgroundColor: colors.primaryBlue },
+        headerTintColor: colors.white,
+        headerTitleStyle: { fontWeight: "bold" },
+        tabBarActiveTintColor: colors.primaryBlue,
+        tabBarInactiveTintColor: colors.bodyText,
+        tabBarStyle: {
+          backgroundColor: colors.white,
+          borderTopColor: colors.border,
+          paddingBottom: 4,
+          paddingTop: 4,
+          height: 56,
+        },
+        tabBarIcon: ({ focused, color, size }) => {
+          const icons = TAB_ICONS[route.name];
+          const iconName = focused ? icons.focused : icons.unfocused;
+          return <Ionicons name={iconName as any} size={size} color={color} />;
+        },
+      })}
     >
       <MainTab.Screen
         name="Dashboard"
@@ -91,7 +113,12 @@ function MainNavigator() {
       <RootStack.Screen
         name="Chat"
         component={ChatScreen}
-        options={{ title: "Chat" }}
+        options={{
+          title: "Chat",
+          headerStyle: { backgroundColor: colors.primaryBlue },
+          headerTintColor: colors.white,
+          headerTitleStyle: { fontWeight: "bold" },
+        }}
       />
     </RootStack.Navigator>
   );
@@ -102,8 +129,8 @@ export default function AppNavigator() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" color="#1B5E20" />
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.white }}>
+        <ActivityIndicator size="large" color={colors.primaryBlue} />
       </View>
     );
   }

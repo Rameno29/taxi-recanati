@@ -6,9 +6,11 @@ import {
   StyleSheet,
   Alert,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import MapPlaceholder from "../components/MapPlaceholder";
 import { useDriver } from "../context/DriverContext";
+import { colors, spacing, radii, fonts } from "../theme";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { MainTabParamList } from "../navigation/AppNavigator";
 
@@ -44,7 +46,6 @@ export default function DashboardScreen({ navigation }: Props) {
     if (!incomingRequest) return;
     try {
       await acceptRide(incomingRequest.id);
-      // Navigate to active ride tab
       navigation.navigate("ActiveRide");
     } catch (err: any) {
       Alert.alert(t("common.error"), err.message);
@@ -56,11 +57,14 @@ export default function DashboardScreen({ navigation }: Props) {
     return (
       <View style={styles.container}>
         <View style={styles.activeRideBanner}>
+          <Ionicons name="car-sport" size={48} color={colors.primaryBlue} style={{ marginBottom: spacing.md }} />
           <Text style={styles.bannerText}>{t("ride.activeRide")}</Text>
           <TouchableOpacity
             style={styles.goToRideBtn}
             onPress={() => navigation.navigate("ActiveRide")}
+            activeOpacity={0.8}
           >
+            <Ionicons name="navigate" size={20} color={colors.white} style={{ marginRight: 8 }} />
             <Text style={styles.goToRideBtnText}>{t("tabs.ride")}</Text>
           </TouchableOpacity>
         </View>
@@ -77,17 +81,29 @@ export default function DashboardScreen({ navigation }: Props) {
         <TouchableOpacity
           style={[styles.toggleBtn, isOnline ? styles.toggleOnline : styles.toggleOffline]}
           onPress={handleToggle}
+          activeOpacity={0.85}
         >
-          <View style={[styles.dot, isOnline ? styles.dotOnline : styles.dotOffline]} />
+          <Ionicons
+            name={isOnline ? "power" : "power-outline"}
+            size={22}
+            color={colors.white}
+            style={{ marginRight: 10 }}
+          />
           <Text style={styles.toggleText}>
             {isOnline ? t("dashboard.goOffline") : t("dashboard.goOnline")}
           </Text>
+          {isOnline && (
+            <View style={styles.liveIndicator}>
+              <View style={styles.liveDot} />
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
       {/* Status indicator */}
       {isOnline && !incomingRequest && (
         <View style={styles.waitingBanner}>
+          <Ionicons name="time-outline" size={18} color={colors.bodyText} style={{ marginRight: 8 }} />
           <Text style={styles.waitingText}>{t("dashboard.waitingForRides")}</Text>
         </View>
       )}
@@ -95,43 +111,62 @@ export default function DashboardScreen({ navigation }: Props) {
       {/* Incoming ride request */}
       {incomingRequest && (
         <View style={styles.requestCard}>
-          <Text style={styles.requestTitle}>{t("dashboard.newRequest")}</Text>
-
-          <View style={styles.requestRow}>
-            <Text style={styles.requestLabel}>{t("dashboard.pickup")}:</Text>
-            <Text style={styles.requestValue} numberOfLines={1}>
-              {incomingRequest.pickup_address ||
-                `${Number(incomingRequest.pickup_lat).toFixed(4)}, ${Number(incomingRequest.pickup_lng).toFixed(4)}`}
-            </Text>
+          <View style={styles.requestHeader}>
+            <Ionicons name="notifications" size={24} color={colors.accentCoral} />
+            <Text style={styles.requestTitle}>{t("dashboard.newRequest")}</Text>
           </View>
 
-          <View style={styles.requestRow}>
-            <Text style={styles.requestLabel}>{t("dashboard.destination")}:</Text>
-            <Text style={styles.requestValue} numberOfLines={1}>
-              {incomingRequest.destination_address ||
-                `${Number(incomingRequest.destination_lat).toFixed(4)}, ${Number(incomingRequest.destination_lng).toFixed(4)}`}
-            </Text>
+          <View style={styles.requestDetails}>
+            <View style={styles.requestRow}>
+              <Ionicons name="location" size={18} color={colors.driverGreen} />
+              <View style={styles.requestRowContent}>
+                <Text style={styles.requestLabel}>{t("dashboard.pickup")}</Text>
+                <Text style={styles.requestValue} numberOfLines={1}>
+                  {incomingRequest.pickup_address ||
+                    `${Number(incomingRequest.pickup_lat).toFixed(4)}, ${Number(incomingRequest.pickup_lng).toFixed(4)}`}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.requestDivider} />
+
+            <View style={styles.requestRow}>
+              <Ionicons name="flag" size={18} color={colors.accentCoral} />
+              <View style={styles.requestRowContent}>
+                <Text style={styles.requestLabel}>{t("dashboard.destination")}</Text>
+                <Text style={styles.requestValue} numberOfLines={1}>
+                  {incomingRequest.destination_address ||
+                    `${Number(incomingRequest.destination_lat).toFixed(4)}, ${Number(incomingRequest.destination_lng).toFixed(4)}`}
+                </Text>
+              </View>
+            </View>
           </View>
 
-          <View style={styles.requestRow}>
-            <Text style={styles.requestLabel}>{t("dashboard.fare")}:</Text>
-            <Text style={styles.requestFare}>
-              €{Number(incomingRequest.fare_estimate).toFixed(2)}
-            </Text>
-          </View>
-
-          <View style={styles.requestRow}>
-            <Text style={styles.requestLabel}>{t("dashboard.distance")}:</Text>
-            <Text style={styles.requestValue}>
-              {(Number(incomingRequest.distance_meters) / 1000).toFixed(1)} km
-            </Text>
+          <View style={styles.requestStats}>
+            <View style={styles.requestStat}>
+              <Ionicons name="cash-outline" size={20} color={colors.primaryBlue} />
+              <Text style={styles.requestStatValue}>
+                €{Number(incomingRequest.fare_estimate).toFixed(2)}
+              </Text>
+              <Text style={styles.requestStatLabel}>{t("dashboard.fare")}</Text>
+            </View>
+            <View style={styles.requestStatDivider} />
+            <View style={styles.requestStat}>
+              <Ionicons name="speedometer-outline" size={20} color={colors.primaryBlue} />
+              <Text style={styles.requestStatValue}>
+                {(Number(incomingRequest.distance_meters) / 1000).toFixed(1)} km
+              </Text>
+              <Text style={styles.requestStatLabel}>{t("dashboard.distance")}</Text>
+            </View>
           </View>
 
           <View style={styles.requestActions}>
-            <TouchableOpacity style={styles.declineBtn} onPress={declineRide}>
+            <TouchableOpacity style={styles.declineBtn} onPress={declineRide} activeOpacity={0.8}>
+              <Ionicons name="close" size={20} color={colors.error} />
               <Text style={styles.declineBtnText}>{t("dashboard.decline")}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.acceptBtn} onPress={handleAccept}>
+            <TouchableOpacity style={styles.acceptBtn} onPress={handleAccept} activeOpacity={0.8}>
+              <Ionicons name="checkmark" size={20} color={colors.white} />
               <Text style={styles.acceptBtnText}>{t("dashboard.accept")}</Text>
             </TouchableOpacity>
           </View>
@@ -146,106 +181,170 @@ const styles = StyleSheet.create({
   map: { flex: 1 },
   toggleContainer: {
     position: "absolute",
-    top: 16,
+    top: spacing.md,
     alignSelf: "center",
   },
   toggleBtn: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 24,
+    paddingHorizontal: spacing.lg,
     paddingVertical: 14,
-    borderRadius: 30,
+    borderRadius: radii.pill,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 4,
   },
-  toggleOnline: { backgroundColor: "#F44336" },
-  toggleOffline: { backgroundColor: "#1B5E20" },
-  dot: { width: 12, height: 12, borderRadius: 6, marginRight: 10 },
-  dotOnline: { backgroundColor: "#4CAF50" },
-  dotOffline: { backgroundColor: "#999" },
-  toggleText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  toggleOnline: { backgroundColor: colors.error },
+  toggleOffline: { backgroundColor: colors.primaryBlue },
+  liveIndicator: { marginLeft: 10 },
+  liveDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.driverGreen,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.5)",
+  },
+  toggleText: { color: colors.white, fontWeight: "bold", fontSize: fonts.body },
   waitingBanner: {
     position: "absolute",
-    bottom: 24,
+    bottom: spacing.lg,
     alignSelf: "center",
-    backgroundColor: "#fff",
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 20,
+    backgroundColor: colors.white,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: radii.xl,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 3,
   },
-  waitingText: { color: "#666", fontSize: 14 },
+  waitingText: { color: colors.bodyText, fontSize: fonts.label },
   activeRideBanner: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#E8F5E9",
-    padding: 24,
+    backgroundColor: colors.primaryBlueLight,
+    padding: spacing.lg,
   },
-  bannerText: { fontSize: 20, fontWeight: "bold", color: "#1B5E20", marginBottom: 16 },
+  bannerText: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: colors.primaryBlue,
+    marginBottom: spacing.md,
+  },
   goToRideBtn: {
-    backgroundColor: "#1B5E20",
-    paddingHorizontal: 32,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.primaryBlue,
+    paddingHorizontal: spacing.xl,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: radii.md,
+    shadowColor: colors.primaryBlue,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  goToRideBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  goToRideBtnText: { color: colors.white, fontWeight: "bold", fontSize: fonts.body },
   requestCard: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
+    backgroundColor: colors.white,
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
+    padding: spacing.lg,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -3 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 6,
   },
+  requestHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
   requestTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#1B5E20",
-    marginBottom: 12,
-    textAlign: "center",
+    color: colors.dark,
+  },
+  requestDetails: {
+    backgroundColor: colors.lightBg,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
   },
   requestRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
+    alignItems: "flex-start",
+    gap: spacing.sm,
   },
-  requestLabel: { fontSize: 14, color: "#666" },
-  requestValue: { fontSize: 14, color: "#333", flex: 1, textAlign: "right" },
-  requestFare: { fontSize: 18, fontWeight: "bold", color: "#1B5E20" },
+  requestRowContent: { flex: 1 },
+  requestLabel: { fontSize: fonts.caption, color: colors.bodyText },
+  requestValue: { fontSize: fonts.label, color: colors.dark, fontWeight: "500", marginTop: 2 },
+  requestDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: spacing.sm,
+    marginLeft: 26,
+  },
+  requestStats: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.md,
+  },
+  requestStat: { flex: 1, alignItems: "center", gap: 2 },
+  requestStatValue: { fontSize: 20, fontWeight: "bold", color: colors.dark },
+  requestStatLabel: { fontSize: fonts.caption, color: colors.bodyText },
+  requestStatDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: colors.border,
+  },
   requestActions: {
     flexDirection: "row",
-    gap: 12,
-    marginTop: 16,
+    gap: spacing.md,
   },
   declineBtn: {
     flex: 1,
-    backgroundColor: "#F44336",
-    padding: 14,
-    borderRadius: 12,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.white,
+    borderWidth: 1.5,
+    borderColor: colors.error,
+    padding: 14,
+    borderRadius: radii.md,
   },
-  declineBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  declineBtnText: { color: colors.error, fontWeight: "bold", fontSize: fonts.body },
   acceptBtn: {
     flex: 2,
-    backgroundColor: "#1B5E20",
-    padding: 14,
-    borderRadius: 12,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.primaryBlue,
+    padding: 14,
+    borderRadius: radii.md,
+    shadowColor: colors.primaryBlue,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  acceptBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  acceptBtnText: { color: colors.white, fontWeight: "bold", fontSize: fonts.body },
+  requestFare: { fontSize: 18, fontWeight: "bold", color: colors.primaryBlue },
 });

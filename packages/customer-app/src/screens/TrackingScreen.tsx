@@ -7,12 +7,15 @@ import {
   Alert,
   RefreshControl,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import MapPlaceholder from "../components/MapPlaceholder";
 import { useFocusEffect } from "@react-navigation/native";
 import { api } from "../services/api";
 import { getSocket } from "../services/socket";
+import { colors, spacing, radii, shadows } from "../theme";
 import type { Ride, Location } from "../types";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { MainTabParamList } from "../navigation/AppNavigator";
@@ -20,12 +23,21 @@ import type { MainTabParamList } from "../navigation/AppNavigator";
 type Props = BottomTabScreenProps<MainTabParamList, "Tracking">;
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: "#FF9800",
-  accepted: "#2196F3",
+  pending: colors.warning,
+  accepted: colors.primaryBlue,
   arriving: "#9C27B0",
-  in_progress: "#4CAF50",
+  in_progress: colors.success,
   completed: "#607D8B",
-  cancelled: "#F44336",
+  cancelled: colors.error,
+};
+
+const STATUS_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+  pending: "time-outline",
+  accepted: "checkmark-circle-outline",
+  arriving: "navigate-outline",
+  in_progress: "car-outline",
+  completed: "checkmark-done-outline",
+  cancelled: "close-circle-outline",
 };
 
 export default function TrackingScreen({ navigation }: Props) {
@@ -125,7 +137,8 @@ export default function TrackingScreen({ navigation }: Props) {
   if (loading) {
     return (
       <View style={styles.center}>
-        <Text>{t("common.loading")}</Text>
+        <ActivityIndicator size="large" color={colors.primaryBlue} />
+        <Text style={styles.loadingText}>{t("common.loading")}</Text>
       </View>
     );
   }
@@ -135,9 +148,10 @@ export default function TrackingScreen({ navigation }: Props) {
       <ScrollView
         contentContainerStyle={styles.center}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={fetchActiveRide} />
+          <RefreshControl refreshing={loading} onRefresh={fetchActiveRide} tintColor={colors.primaryBlue} />
         }
       >
+        <Ionicons name="car-outline" size={64} color={colors.border} />
         <Text style={styles.emptyText}>{t("ride.noActiveRide")}</Text>
       </ScrollView>
     );
@@ -162,16 +176,25 @@ export default function TrackingScreen({ navigation }: Props) {
 
       <View style={styles.infoPanel}>
         <View style={[styles.statusBadge, { backgroundColor: STATUS_COLORS[ride.status] || "#999" }]}>
+          <Ionicons
+            name={STATUS_ICONS[ride.status] || "help-circle-outline"}
+            size={16}
+            color={colors.white}
+            style={{ marginRight: 6 }}
+          />
           <Text style={styles.statusText}>
             {t(`ride.${ride.status}` as any)}
           </Text>
         </View>
 
         {ride.driver_name && (
-          <Text style={styles.driverInfo}>
-            {t("ride.driver")}: {ride.driver_name}
-            {ride.license_plate ? ` • ${ride.license_plate}` : ""}
-          </Text>
+          <View style={styles.driverRow}>
+            <Ionicons name="person-circle-outline" size={20} color={colors.primaryBlue} />
+            <Text style={styles.driverInfo}>
+              {ride.driver_name}
+              {ride.license_plate ? ` · ${ride.license_plate}` : ""}
+            </Text>
+          </View>
         )}
 
         <Text style={styles.fareText}>
@@ -180,13 +203,15 @@ export default function TrackingScreen({ navigation }: Props) {
 
         <View style={styles.actions}>
           {canCancel && (
-            <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel} activeOpacity={0.8}>
+              <Ionicons name="close-circle-outline" size={20} color={colors.white} style={{ marginRight: 6 }} />
               <Text style={styles.cancelBtnText}>{t("ride.cancelRide")}</Text>
             </TouchableOpacity>
           )}
 
           {ride.driver_id && !isCompleted && (
-            <TouchableOpacity style={styles.chatBtn} onPress={openChat}>
+            <TouchableOpacity style={styles.chatBtn} onPress={openChat} activeOpacity={0.8}>
+              <Ionicons name="chatbubble-outline" size={20} color={colors.white} style={{ marginRight: 6 }} />
               <Text style={styles.chatBtnText}>{t("ride.chat")}</Text>
             </TouchableOpacity>
           )}
@@ -198,14 +223,16 @@ export default function TrackingScreen({ navigation }: Props) {
             <View style={styles.stars}>
               {[1, 2, 3, 4, 5].map((star) => (
                 <TouchableOpacity key={star} onPress={() => setRating(star)}>
-                  <Text style={[styles.star, star <= rating && styles.starActive]}>
-                    ★
-                  </Text>
+                  <Ionicons
+                    name={star <= rating ? "star" : "star-outline"}
+                    size={36}
+                    color={star <= rating ? colors.accentCoral : colors.border}
+                  />
                 </TouchableOpacity>
               ))}
             </View>
             {rating > 0 && (
-              <TouchableOpacity style={styles.submitBtn} onPress={handleRate}>
+              <TouchableOpacity style={styles.submitBtn} onPress={handleRate} activeOpacity={0.8}>
                 <Text style={styles.submitBtnText}>{t("ride.submit")}</Text>
               </TouchableOpacity>
             )}
@@ -217,59 +244,66 @@ export default function TrackingScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  emptyText: { fontSize: 16, color: "#999" },
+  container: { flex: 1, backgroundColor: colors.lightBg },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.lightBg, gap: spacing.md },
+  loadingText: { fontSize: 16, color: colors.bodyText, marginTop: spacing.sm },
+  emptyText: { fontSize: 16, color: colors.bodyText },
   map: { flex: 1 },
   infoPanel: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.white,
     padding: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
+    ...shadows.panel,
   },
   statusBadge: {
     alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginBottom: 12,
+    paddingVertical: 8,
+    borderRadius: radii.full,
+    marginBottom: spacing.md,
   },
-  statusText: { color: "#fff", fontWeight: "bold", fontSize: 14 },
-  driverInfo: { fontSize: 16, color: "#333", marginBottom: 8 },
-  fareText: { fontSize: 20, fontWeight: "bold", color: "#333", marginBottom: 12 },
-  actions: { flexDirection: "row", gap: 12, marginBottom: 8 },
+  statusText: { color: colors.white, fontWeight: "bold", fontSize: 14 },
+  driverRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  driverInfo: { fontSize: 16, color: colors.dark, fontWeight: "500" },
+  fareText: { fontSize: 20, fontWeight: "bold", color: colors.dark, marginBottom: spacing.md },
+  actions: { flexDirection: "row", gap: spacing.md, marginBottom: spacing.sm },
   cancelBtn: {
     flex: 1,
-    backgroundColor: "#F44336",
+    backgroundColor: colors.error,
     padding: 14,
-    borderRadius: 12,
+    borderRadius: radii.md,
     alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
   },
-  cancelBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  cancelBtnText: { color: colors.white, fontWeight: "bold", fontSize: 16 },
   chatBtn: {
     flex: 1,
-    backgroundColor: "#2196F3",
+    backgroundColor: colors.primaryBlue,
     padding: 14,
-    borderRadius: 12,
+    borderRadius: radii.md,
     alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
   },
-  chatBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
-  ratingSection: { marginTop: 12, alignItems: "center" },
-  ratingPrompt: { fontSize: 16, color: "#333", marginBottom: 8 },
-  stars: { flexDirection: "row", gap: 8 },
-  star: { fontSize: 36, color: "#ddd" },
-  starActive: { color: "#FFC107" },
+  chatBtnText: { color: colors.white, fontWeight: "bold", fontSize: 16 },
+  ratingSection: { marginTop: spacing.md, alignItems: "center" },
+  ratingPrompt: { fontSize: 16, color: colors.dark, marginBottom: spacing.sm, fontWeight: "500" },
+  stars: { flexDirection: "row", gap: spacing.sm },
   submitBtn: {
-    backgroundColor: "#FFC107",
+    backgroundColor: colors.primaryBlue,
     paddingHorizontal: 32,
     paddingVertical: 12,
-    borderRadius: 12,
-    marginTop: 12,
+    borderRadius: radii.md,
+    marginTop: spacing.md,
   },
-  submitBtnText: { fontWeight: "bold", fontSize: 16 },
+  submitBtnText: { fontWeight: "bold", fontSize: 16, color: colors.white },
 });

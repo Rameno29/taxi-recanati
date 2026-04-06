@@ -6,10 +6,44 @@ import {
   RefreshControl,
   ScrollView,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useFocusEffect } from "@react-navigation/native";
 import { api } from "../services/api";
+import { colors, spacing, radii, fonts } from "../theme";
 import type { EarningsSummary } from "../types";
+
+type EarningPeriod = {
+  labelKey: string;
+  amountKey: keyof EarningsSummary;
+  ridesKey: keyof EarningsSummary;
+  icon: keyof typeof Ionicons.glyphMap;
+  accentColor: string;
+};
+
+const PERIODS: EarningPeriod[] = [
+  {
+    labelKey: "earnings.today",
+    amountKey: "today",
+    ridesKey: "total_rides_today",
+    icon: "today-outline",
+    accentColor: colors.accentCoral,
+  },
+  {
+    labelKey: "earnings.week",
+    amountKey: "week",
+    ridesKey: "total_rides_week",
+    icon: "calendar-outline",
+    accentColor: colors.primaryBlue,
+  },
+  {
+    labelKey: "earnings.month",
+    amountKey: "month",
+    ridesKey: "total_rides_month",
+    icon: "calendar",
+    accentColor: colors.driverGreen,
+  },
+];
 
 export default function EarningsScreen() {
   const { t } = useTranslation();
@@ -40,6 +74,7 @@ export default function EarningsScreen() {
   if (!earnings && !loading) {
     return (
       <View style={styles.center}>
+        <Ionicons name="wallet-outline" size={64} color={colors.border} />
         <Text style={styles.emptyText}>{t("earnings.noData")}</Text>
       </View>
     );
@@ -53,60 +88,54 @@ export default function EarningsScreen() {
         <RefreshControl refreshing={loading} onRefresh={fetchEarnings} />
       }
     >
-      {/* Today */}
-      <View style={styles.card}>
-        <Text style={styles.cardLabel}>{t("earnings.today")}</Text>
-        <Text style={styles.cardAmount}>
-          €{earnings ? Number(earnings.today).toFixed(2) : "0.00"}
-        </Text>
-        <Text style={styles.cardRides}>
-          {earnings?.total_rides_today || 0} {t("earnings.rides")}
-        </Text>
-      </View>
-
-      {/* This week */}
-      <View style={styles.card}>
-        <Text style={styles.cardLabel}>{t("earnings.week")}</Text>
-        <Text style={styles.cardAmount}>
-          €{earnings ? Number(earnings.week).toFixed(2) : "0.00"}
-        </Text>
-        <Text style={styles.cardRides}>
-          {earnings?.total_rides_week || 0} {t("earnings.rides")}
-        </Text>
-      </View>
-
-      {/* This month */}
-      <View style={styles.card}>
-        <Text style={styles.cardLabel}>{t("earnings.month")}</Text>
-        <Text style={styles.cardAmount}>
-          €{earnings ? Number(earnings.month).toFixed(2) : "0.00"}
-        </Text>
-        <Text style={styles.cardRides}>
-          {earnings?.total_rides_month || 0} {t("earnings.rides")}
-        </Text>
-      </View>
+      {PERIODS.map((period) => (
+        <View key={period.labelKey} style={styles.card}>
+          <View style={[styles.cardIconContainer, { backgroundColor: period.accentColor + "15" }]}>
+            <Ionicons name={period.icon as any} size={28} color={period.accentColor} />
+          </View>
+          <View style={styles.cardContent}>
+            <Text style={styles.cardLabel}>{t(period.labelKey as any)}</Text>
+            <Text style={styles.cardAmount}>
+              €{earnings ? Number(earnings[period.amountKey]).toFixed(2) : "0.00"}
+            </Text>
+            <Text style={styles.cardRides}>
+              {(earnings?.[period.ridesKey] as number) || 0} {t("earnings.rides")}
+            </Text>
+          </View>
+        </View>
+      ))}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f5f5f5" },
-  content: { padding: 16 },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  emptyText: { fontSize: 16, color: "#999" },
+  container: { flex: 1, backgroundColor: colors.lightBg },
+  content: { padding: spacing.md },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", gap: spacing.md },
+  emptyText: { fontSize: fonts.body, color: colors.bodyText },
   card: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 16,
+    flexDirection: "row",
     alignItems: "center",
+    backgroundColor: colors.white,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.06,
     shadowRadius: 4,
     elevation: 2,
   },
-  cardLabel: { fontSize: 14, color: "#666", marginBottom: 8 },
-  cardAmount: { fontSize: 36, fontWeight: "bold", color: "#1B5E20" },
-  cardRides: { fontSize: 14, color: "#999", marginTop: 4 },
+  cardIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: spacing.md,
+  },
+  cardContent: { flex: 1 },
+  cardLabel: { fontSize: fonts.label, color: colors.bodyText, marginBottom: spacing.xs },
+  cardAmount: { fontSize: 32, fontWeight: "bold", color: colors.dark },
+  cardRides: { fontSize: fonts.caption, color: colors.bodyText, marginTop: 2 },
 });

@@ -6,9 +6,11 @@ import {
   StyleSheet,
   RefreshControl,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useFocusEffect } from "@react-navigation/native";
 import { api } from "../services/api";
+import { colors, spacing, radii, shadows } from "../theme";
 import type { Ride } from "../types";
 
 export default function HistoryScreen() {
@@ -51,25 +53,40 @@ export default function HistoryScreen() {
           <Text style={styles.date}>
             {date.toLocaleDateString()} {date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
           </Text>
-          <View style={[styles.statusBadge, { backgroundColor: item.status === "completed" ? "#4CAF50" : "#F44336" }]}>
+          <View style={[styles.statusBadge, { backgroundColor: item.status === "completed" ? colors.success : colors.error }]}>
             <Text style={styles.statusText}>{t(`ride.${item.status}` as any)}</Text>
           </View>
         </View>
 
-        <Text style={styles.address} numberOfLines={1}>
-          📍 {item.pickup_address || `${Number(item.pickup_lat).toFixed(4)}, ${Number(item.pickup_lng).toFixed(4)}`}
-        </Text>
-        <Text style={styles.address} numberOfLines={1}>
-          🏁 {item.destination_address || `${Number(item.destination_lat).toFixed(4)}, ${Number(item.destination_lng).toFixed(4)}`}
-        </Text>
-
-        <Text style={styles.fare}>€{Number(fare).toFixed(2)}</Text>
-
-        {item.customer_rating && (
-          <Text style={styles.rating}>
-            {"★".repeat(item.customer_rating)}{"☆".repeat(5 - item.customer_rating)}
+        <View style={styles.addressRow}>
+          <Ionicons name="location" size={16} color={colors.primaryBlue} />
+          <Text style={styles.address} numberOfLines={1}>
+            {item.pickup_address || `${Number(item.pickup_lat).toFixed(4)}, ${Number(item.pickup_lng).toFixed(4)}`}
           </Text>
-        )}
+        </View>
+        <View style={styles.addressRow}>
+          <Ionicons name="flag" size={16} color={colors.accentCoral} />
+          <Text style={styles.address} numberOfLines={1}>
+            {item.destination_address || `${Number(item.destination_lat).toFixed(4)}, ${Number(item.destination_lng).toFixed(4)}`}
+          </Text>
+        </View>
+
+        <View style={styles.cardFooter}>
+          <Text style={styles.fare}>€{Number(fare).toFixed(2)}</Text>
+
+          {item.customer_rating && (
+            <View style={styles.ratingRow}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Ionicons
+                  key={star}
+                  name={star <= item.customer_rating! ? "star" : "star-outline"}
+                  size={16}
+                  color={star <= item.customer_rating! ? colors.accentCoral : colors.border}
+                />
+              ))}
+            </View>
+          )}
+        </View>
       </View>
     );
   };
@@ -80,8 +97,9 @@ export default function HistoryScreen() {
       keyExtractor={(item) => item.id}
       renderItem={renderRide}
       contentContainerStyle={styles.list}
+      style={{ backgroundColor: colors.lightBg }}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => fetchHistory(1)} />
+        <RefreshControl refreshing={loading} onRefresh={() => fetchHistory(1)} tintColor={colors.primaryBlue} />
       }
       onEndReached={() => {
         if (page < totalPages && !loading) fetchHistory(page + 1);
@@ -90,6 +108,7 @@ export default function HistoryScreen() {
       ListEmptyComponent={
         !loading ? (
           <View style={styles.empty}>
+            <Ionicons name="receipt-outline" size={56} color={colors.border} />
             <Text style={styles.emptyText}>{t("history.empty")}</Text>
           </View>
         ) : null
@@ -99,34 +118,45 @@ export default function HistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  list: { padding: 16, flexGrow: 1 },
-  empty: { flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 60 },
-  emptyText: { fontSize: 16, color: "#999" },
+  list: { padding: spacing.md, flexGrow: 1 },
+  empty: { flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 60, gap: spacing.md },
+  emptyText: { fontSize: 16, color: colors.bodyText },
   card: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: colors.white,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    ...shadows.card,
   },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
-  date: { fontSize: 14, color: "#666" },
+  date: { fontSize: 14, color: colors.bodyText },
   statusBadge: {
     paddingHorizontal: 10,
     paddingVertical: 3,
-    borderRadius: 12,
+    borderRadius: radii.full,
   },
-  statusText: { color: "#fff", fontSize: 12, fontWeight: "bold" },
-  address: { fontSize: 14, color: "#333", marginBottom: 4 },
-  fare: { fontSize: 18, fontWeight: "bold", color: "#333", marginTop: 8 },
-  rating: { fontSize: 16, color: "#FFC107", marginTop: 4 },
+  statusText: { color: colors.white, fontSize: 12, fontWeight: "bold" },
+  addressRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginBottom: 4,
+  },
+  address: { flex: 1, fontSize: 14, color: colors.dark },
+  cardFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  fare: { fontSize: 18, fontWeight: "bold", color: colors.dark },
+  ratingRow: { flexDirection: "row", gap: 2 },
 });
