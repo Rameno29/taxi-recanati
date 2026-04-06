@@ -31,7 +31,8 @@
       ["expo-notifications", {
         "icon": "./assets/icon.png",
         "color": "#4357AD"
-      }]
+      }],
+      "@stripe/stripe-react-native"
     ]
   }
 }
