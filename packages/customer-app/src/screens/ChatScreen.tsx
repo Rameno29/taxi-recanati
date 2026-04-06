@@ -36,7 +36,10 @@ export default function ChatScreen({ route }: Props) {
     if (socket) {
       const handleNewMessage = (msg: Message) => {
         if (msg.ride_id === rideId) {
-          setMessages((prev) => [...prev, msg]);
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === msg.id)) return prev;
+            return [...prev, msg];
+          });
         }
       };
       socket.on("chat:message", handleNewMessage);
