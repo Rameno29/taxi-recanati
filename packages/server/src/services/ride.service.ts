@@ -213,7 +213,7 @@ export async function updateRideStatus(
     });
 
     // Broadcast status change via Socket.io
-    broadcastRideStatus(rideId, currentStatus, newStatus);
+    broadcastRideStatus(rideId, currentStatus, newStatus, updatedRide);
 
     // Auto-capture payment on ride completion (best-effort)
     if (newStatus === "completed") {
