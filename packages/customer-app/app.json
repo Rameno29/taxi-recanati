@@ -1,7 +1,8 @@
 {
   "expo": {
-    "name": "customer-app",
-    "slug": "customer-app",
+    "name": "Taxi Recanati",
+    "slug": "taxi-recanati-customer",
+    "scheme": "taxirecanati",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -10,12 +11,23 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#4357AD"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "it.taxirecanati.customer",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "L'app ha bisogno della tua posizione per individuare il punto di partenza e mostrarti i taxi disponibili nelle vicinanze."
+      }
     },
     "android": {
+      "package": "it.taxirecanati.customer",
+      "versionCode": 1,
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"

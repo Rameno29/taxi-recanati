@@ -1,7 +1,8 @@
 {
   "expo": {
-    "name": "driver-app",
-    "slug": "driver-app",
+    "name": "Taxi Recanati Autista",
+    "slug": "taxi-recanati-driver",
+    "scheme": "taxirecanatidriver",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -10,12 +11,26 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#4357AD"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "it.taxirecanati.driver",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "L'app ha bisogno della tua posizione per mostrare la tua posizione ai clienti e ricevere richieste di corsa nelle vicinanze.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "L'app ha bisogno di accedere alla tua posizione anche in background per aggiornare continuamente la tua disponibilita' e ricevere nuove richieste di corsa.",
+        "UIBackgroundModes": ["location", "remote-notification"]
+      }
     },
     "android": {
+      "package": "it.taxirecanati.driver",
+      "versionCode": 1,
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -31,7 +46,9 @@
       ["expo-notifications", {
         "icon": "./assets/icon.png",
         "color": "#4357AD"
-      }]
+      }],
+      "expo-location",
+      "expo-task-manager"
     ]
   }
 }
