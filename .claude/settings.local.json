@@ -13,7 +13,20 @@
       "Bash(npm install:*)",
       "Bash(npx tsc:*)",
       "Bash(npx create-expo-app@latest driver-app --template blank-typescript)",
-      "Bash(gh pr:*)"
+      "Bash(gh pr:*)",
+      "Bash(curl -s -L \"https://www.taxirecanati.it/assets/css/custom.css\")",
+      "Bash(curl -s -L \"https://www.taxirecanati.it/assets/css/default.css\")",
+      "Bash(curl -s -L https://www.taxirecanati.it/assets/css/style.css)",
+      "Bash(grep -oE '#[0-9a-fA-F]{3,8}')",
+      "Bash(curl -s -L https://www.taxirecanati.it/assets/css/custom.css)",
+      "Bash(curl -s -L \"https://www.taxirecanati.it/assets/css/responsive.css\")",
+      "Bash(git -C \"C:/Users/stafi.000/Desktop/Taxi Recanati\" diff --stat)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(find 'C:/Users/stafi.000/Desktop/Taxi Recanati/packages/customer-app/src' -name *.ts -o -name *.tsx)",
+      "Bash(find 'C:/Users/stafi.000/Desktop/Taxi Recanati/packages/driver-app/src' -name *.ts -o -name *.tsx)",
+      "Bash(find 'C:/Users/stafi.000/Desktop/Taxi Recanati/packages/admin-dashboard/src' -name *.ts -o -name *.tsx)",
+      "Bash(find 'C:/Users/stafi.000/Desktop/Taxi Recanati/packages/server' -name *.ts -path */migrations/*)",
+      "Bash(find 'C:/Users/stafi.000/Desktop/Taxi Recanati/packages/server' -name *.test.* -o -name jest* -o -name *.spec.*)"
     ]
   }
 }
