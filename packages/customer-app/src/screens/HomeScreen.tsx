@@ -11,6 +11,7 @@ import {
 import * as ExpoLocation from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
 import MapPlaceholder from "../components/MapPlaceholder";
+import PaymentSheet from "../components/PaymentSheet";
 import { useTranslation } from "react-i18next";
 import { api } from "../services/api";
 import { colors, spacing, radii, shadows } from "../theme";
@@ -49,6 +50,8 @@ export default function HomeScreen({ navigation }: Props) {
   const [fareEstimate, setFareEstimate] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectingPoint, setSelectingPoint] = useState<"pickup" | "destination">("pickup");
+  const [pendingRideId, setPendingRideId] = useState<string | null>(null);
+  const [showPayment, setShowPayment] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -73,6 +76,13 @@ export default function HomeScreen({ navigation }: Props) {
       setDestinationAddress(`${coord.latitude.toFixed(4)}, ${coord.longitude.toFixed(4)}`);
     }
     setFareEstimate(null);
+  };
+
+  const navigateToTracking = () => {
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.navigate("MainTabs", { screen: "Tracking" });
+    }
   };
 
   const handleBookRide = async () => {
@@ -100,18 +110,46 @@ export default function HomeScreen({ navigation }: Props) {
       }
 
       const data = await res.json();
-      setFareEstimate(data.fareBreakdown?.estimated_fare || data.ride.fare_estimate);
+      const fare = data.fareBreakdown?.estimated_fare || data.ride.fare_estimate;
+      setFareEstimate(fare);
 
-      // Navigate to tracking
-      const parent = navigation.getParent();
-      if (parent) {
-        parent.navigate("MainTabs", { screen: "Tracking" });
+      const rideId = data.ride?.id || data.id;
+
+      // If there is a fare estimate, trigger payment authorization before navigating
+      if (fare && Number(fare) > 0) {
+        setPendingRideId(rideId);
+        setShowPayment(true);
+      } else {
+        // No fare — go straight to tracking
+        navigateToTracking();
       }
     } catch (err: any) {
       Alert.alert(t("common.error"), err.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePaymentSuccess = () => {
+    setShowPayment(false);
+    setPendingRideId(null);
+    navigateToTracking();
+  };
+
+  const handlePaymentCancel = () => {
+    setShowPayment(false);
+    // Ride is created but payment was cancelled — still navigate to tracking
+    // The user can pay later or the ride can be cancelled
+    Alert.alert(
+      t("payment.cancelledTitle", "Pagamento annullato"),
+      t("payment.cancelledMessage", "Puoi completare il pagamento in seguito."),
+      [
+        {
+          text: t("common.ok", "OK"),
+          onPress: navigateToTracking,
+        },
+      ]
+    );
   };
 
   const vehicleOptions: { key: VehicleType; label: string }[] = [
@@ -230,6 +268,14 @@ export default function HomeScreen({ navigation }: Props) {
             {loading ? t("common.loading") : t("home.bookRide")}
           </Text>
         </TouchableOpacity>
+
+        {showPayment && pendingRideId && (
+          <PaymentSheet
+            rideId={pendingRideId}
+            onSuccess={handlePaymentSuccess}
+            onCancel={handlePaymentCancel}
+          />
+        )}
       </View>
     </View>
   );
