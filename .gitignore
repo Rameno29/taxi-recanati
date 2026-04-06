@@ -7,3 +7,5 @@ dist/
 .turbo/
 *.log
 coverage/
+.claude/worktrees/
+.claude/launch.json
