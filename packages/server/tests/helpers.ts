@@ -90,6 +90,22 @@ export async function createTestPricingRule(
   return rule;
 }
 
+export async function createPushToken(
+  db: Knex,
+  userId: string,
+  token?: string
+) {
+  const id = uuidv4();
+  const record = {
+    id,
+    user_id: userId,
+    token: token || `ExponentPushToken[${uuidv4().slice(0, 20)}]`,
+    platform: "android",
+  };
+  await db("push_tokens").insert(record);
+  return record;
+}
+
 export function cleanTables(db: Knex) {
   return async () => {
     await db.raw("TRUNCATE admin_actions, push_tokens, payments, messages, driver_locations, ride_dispatch_attempts, ride_status_history, rides, fixed_routes, pricing_rules, drivers, zones, users CASCADE");
