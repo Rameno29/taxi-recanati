@@ -1,4 +1,4 @@
-import { useState, FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { login } from "../services/auth";
 
@@ -26,29 +26,34 @@ export default function LoginPage() {
   return (
     <div style={styles.container}>
       <form onSubmit={handleSubmit} style={styles.form}>
+        <div style={styles.logoWrap}>
+          <div style={styles.logoIcon}>TR</div>
+        </div>
         <h1 style={styles.title}>Taxi Recanati</h1>
-        <p style={styles.subtitle}>Admin Dashboard</p>
+        <p style={styles.subtitle}>Pannello Amministratore</p>
 
         {error && <div style={styles.error}>{error}</div>}
 
+        <label style={styles.label}>Email</label>
         <input
           type="email"
-          placeholder="Email"
+          placeholder="admin@taxirecanati.it"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
           style={styles.input}
         />
+        <label style={styles.label}>Password</label>
         <input
           type="password"
-          placeholder="Password"
+          placeholder="••••••••"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
           style={styles.input}
         />
         <button type="submit" disabled={loading} style={styles.button}>
-          {loading ? "Loading..." : "Login"}
+          {loading ? "Accesso in corso..." : "Accedi"}
         </button>
       </form>
     </div>
@@ -61,41 +66,71 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "center",
     alignItems: "center",
     minHeight: "100vh",
-    background: "#f5f5f5",
+    background: "linear-gradient(135deg, #4357AD 0%, #2C3B7A 60%, #1E2A5E 100%)",
   },
   form: {
     background: "#fff",
-    padding: 40,
-    borderRadius: 12,
-    boxShadow: "0 2px 12px rgba(0,0,0,0.1)",
-    width: 360,
+    padding: "40px 36px 36px",
+    borderRadius: 16,
+    boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+    width: 380,
     display: "flex",
     flexDirection: "column",
-    gap: 16,
+    gap: 12,
   },
-  title: { margin: 0, textAlign: "center", color: "#1B5E20" },
-  subtitle: { margin: 0, textAlign: "center", color: "#666" },
+  logoWrap: {
+    display: "flex",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  logoIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 14,
+    background: "#F55D3E",
+    color: "#fff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: "bold",
+    fontSize: 22,
+    letterSpacing: 1,
+  },
+  title: { margin: 0, textAlign: "center", color: "#4357AD", fontSize: 26 },
+  subtitle: { margin: "0 0 8px", textAlign: "center", color: "#999", fontSize: 13, letterSpacing: 0.5 },
   error: {
-    background: "#FFEBEE",
-    color: "#C62828",
-    padding: 10,
-    borderRadius: 6,
-    fontSize: 14,
+    background: "#FFF0EE",
+    color: "#D32F2F",
+    padding: "10px 14px",
+    borderRadius: 8,
+    fontSize: 13,
+    border: "1px solid #FFCDD2",
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: "#555",
+    textTransform: "uppercase" as const,
+    letterSpacing: 0.8,
   },
   input: {
-    padding: 12,
-    border: "1px solid #ddd",
-    borderRadius: 8,
-    fontSize: 16,
+    padding: "12px 14px",
+    border: "1px solid #E0E0E0",
+    borderRadius: 10,
+    fontSize: 15,
+    background: "#F7F8FC",
+    outline: "none",
   },
   button: {
+    marginTop: 8,
     padding: 14,
-    background: "#1B5E20",
+    background: "#4357AD",
     color: "#fff",
     border: "none",
-    borderRadius: 8,
-    fontSize: 16,
-    fontWeight: "bold",
+    borderRadius: 10,
+    fontSize: 15,
+    fontWeight: 600,
     cursor: "pointer",
+    letterSpacing: 0.5,
   },
 };
