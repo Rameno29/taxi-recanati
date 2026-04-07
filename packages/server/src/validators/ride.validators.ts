@@ -9,8 +9,8 @@ export const createRideSchema = z
     destination_lng: z.number().min(-180).max(180),
     destination_address: z.string().optional(),
     type: z.enum(["immediate", "reservation"]),
-    scheduled_at: z.string().datetime().optional(),
-    vehicle_type: z.enum(["standard", "monovolume"]),
+    scheduled_at: z.string().datetime().optional().nullable(),
+    vehicle_type: z.enum(["standard", "monovolume", "premium", "van"]),
   })
   .refine(
     (data) => {
@@ -27,7 +27,7 @@ export const fareEstimateSchema = z.object({
   pickup_lng: z.number().min(-180).max(180),
   destination_lat: z.number().min(-90).max(90),
   destination_lng: z.number().min(-180).max(180),
-  vehicle_type: z.enum(["standard", "monovolume"]),
+  vehicle_type: z.enum(["standard", "monovolume", "premium", "van"]),
 });
 
 export const updateStatusSchema = z

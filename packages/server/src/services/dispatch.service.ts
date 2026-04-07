@@ -1,7 +1,7 @@
 import db from "../db";
 import type { DriverRow } from "../types/db";
 import { AppError } from "../middleware/errorHandler";
-import { sendRideRequest } from "../handlers/ride.handler";
+import { sendRideRequest, broadcastRideStatus } from "../handlers/ride.handler";
 
 export interface NearestDriver extends DriverRow {
   distance_meters: number;
@@ -189,6 +189,9 @@ export async function manualDispatch(
         new_status: "accepted",
       }),
     });
+
+    // Broadcast status change to all parties (customer, driver, admin)
+    broadcastRideStatus(rideId, "pending", "accepted", updatedRide);
 
     return updatedRide;
   });

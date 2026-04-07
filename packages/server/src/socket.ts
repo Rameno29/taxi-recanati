@@ -51,7 +51,11 @@ export function initializeSocket(httpServer: HttpServer): Server {
     const socket = rawSocket as AuthenticatedSocket;
     const { userId, role } = socket.user;
 
-    // Auto-join role-based rooms
+    // Every user gets their own room — this ensures they receive
+    // events for rides created AFTER their socket connected
+    socket.join(`user:${userId}`);
+
+    // Role-based rooms
     if (role === "admin") {
       socket.join("admin");
     }
@@ -60,11 +64,18 @@ export function initializeSocket(httpServer: HttpServer): Server {
       socket.join(`driver:${socket.driverId}`);
     }
 
-    // Join active ride room
+    // Join active ride room (if they already have one)
     const activeRide = await findActiveRide(userId, role, socket.driverId);
     if (activeRide) {
       socket.join(`ride:${activeRide.id}`);
     }
+
+    // Allow clients to join a ride room dynamically
+    socket.on("join:ride", (rideId: string) => {
+      if (typeof rideId === "string" && rideId.length > 0) {
+        socket.join(`ride:${rideId}`);
+      }
+    });
 
     socket.on("disconnect", () => {
       // Cleanup handled by Socket.io automatically

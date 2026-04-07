@@ -2,7 +2,7 @@
 export type UserRole = "customer" | "driver" | "admin";
 export type UserLanguage = "it" | "en";
 export type DriverStatus = "offline" | "available" | "busy" | "paused" | "suspended";
-export type VehicleType = "standard" | "monovolume";
+export type VehicleType = "standard" | "monovolume" | "premium" | "van";
 export type RideType = "immediate" | "reservation" | "tour";
 export type RideStatus = "pending" | "accepted" | "arriving" | "in_progress" | "completed" | "cancelled" | "expired" | "no_show";
 export type DispatchMode = "auto" | "manual";

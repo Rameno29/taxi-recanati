@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api } from "../services/api";
+import { onRideStatus } from "../services/socket";
 
 interface Ride {
   id: string;
@@ -43,6 +44,14 @@ export default function RidesPage() {
 
   useEffect(() => {
     fetchRides();
+  }, [page, statusFilter]);
+
+  // Real-time: refresh rides list on any ride status change
+  useEffect(() => {
+    const off = onRideStatus(() => {
+      fetchRides();
+    });
+    return () => { off?.(); };
   }, [page, statusFilter]);
 
   const fetchRides = async () => {

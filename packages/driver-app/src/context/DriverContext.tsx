@@ -37,34 +37,55 @@ export function DriverProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
-  // Listen for incoming ride requests via Socket.io
+  // Listen for incoming ride requests and status changes via Socket.io
   useEffect(() => {
-    const socket = getSocket();
-    if (!socket) return;
+    const tryListen = () => {
+      const socket = getSocket();
+      if (!socket) return null;
 
-    const handleRideRequest = (data: { ride: Ride }) => {
-      setIncomingRequest(data.ride);
-    };
+      const handleRideRequest = (data: any) => {
+        // Server sends ride data directly or wrapped in { ride }
+        const ride = data.ride || data;
+        setIncomingRequest(ride as Ride);
+      };
 
-    const handleStatusChange = (data: { rideId: string; newStatus: string }) => {
-      if (activeRide && data.rideId === activeRide.id) {
-        setActiveRide((prev) =>
-          prev ? { ...prev, status: data.newStatus as any } : null
-        );
-        // If ride ended, clear it
-        if (["completed", "cancelled", "no_show"].includes(data.newStatus)) {
-          setTimeout(() => setActiveRide(null), 2000);
+      const handleStatusChange = (data: any) => {
+        const rideId = data.ride_id || data.rideId;
+        const newStatus = data.new_status || data.newStatus;
+        if (activeRide && rideId === activeRide.id && newStatus) {
+          if (["completed", "cancelled", "no_show"].includes(newStatus)) {
+            setActiveRide(null);
+          } else {
+            setActiveRide((prev) =>
+              prev ? { ...prev, status: newStatus as any } : null
+            );
+          }
         }
-      }
+        // If we had no active ride but got a status update, re-fetch
+        if (!activeRide && newStatus === "accepted") {
+          fetchActiveRide();
+        }
+      };
+
+      socket.on("ride:request", handleRideRequest);
+      socket.on("ride:status", handleStatusChange);
+
+      return () => {
+        socket.off("ride:request", handleRideRequest);
+        socket.off("ride:status", handleStatusChange);
+      };
     };
 
-    socket.on("ride:request", handleRideRequest);
-    socket.on("ride:status_changed", handleStatusChange);
+    const cleanup = tryListen();
+    if (cleanup) return cleanup;
 
-    return () => {
-      socket.off("ride:request", handleRideRequest);
-      socket.off("ride:status_changed", handleStatusChange);
-    };
+    // Retry if socket wasn't ready
+    const retryInterval = setInterval(() => {
+      const c = tryListen();
+      if (c) clearInterval(retryInterval);
+    }, 2000);
+
+    return () => clearInterval(retryInterval);
   }, [activeRide?.id]);
 
   const fetchDriverProfile = async () => {

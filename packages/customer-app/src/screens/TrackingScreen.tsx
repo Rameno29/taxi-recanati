@@ -69,27 +69,70 @@ export default function TrackingScreen({ navigation }: Props) {
     }, [])
   );
 
-  // Listen for real-time updates
+  // Real-time socket listener — handles ALL ride events
+  // Works whether we have an active ride or not
   useEffect(() => {
-    const socket = getSocket();
-    if (!socket || !ride) return;
+    let cleanupFn: (() => void) | null = null;
+    let retryInterval: ReturnType<typeof setInterval> | null = null;
 
-    const handleStatusChange = (data: { rideId: string; newStatus: string }) => {
-      if (data.rideId === ride.id) {
-        setRide((prev) => (prev ? { ...prev, status: data.newStatus as any } : null));
-      }
+    const tryConnect = () => {
+      const socket = getSocket();
+      if (!socket) return false;
+
+      const handleRideStatus = (data: any) => {
+        const newStatus = data.new_status || data.newStatus;
+        const rideId = data.ride_id || data.rideId;
+
+        if (!ride) {
+          // No ride displayed yet — any status event means we should refresh
+          fetchActiveRide();
+          return;
+        }
+
+        if (rideId === ride.id && newStatus) {
+          if (["completed", "cancelled", "expired", "no_show"].includes(newStatus)) {
+            fetchActiveRide(); // re-fetch full final state
+          } else {
+            // Live update the status + driver info without full refetch
+            setRide((prev) => prev ? {
+              ...prev,
+              status: newStatus as any,
+              driver_id: data.driver_id || prev.driver_id,
+              driver_name: data.driver_name || prev.driver_name,
+            } : null);
+            // Also do a full re-fetch to get complete driver info
+            fetchActiveRide();
+          }
+        }
+      };
+
+      const handleDriverLocation = (data: { lat: number; lng: number }) => {
+        setDriverLocation({ latitude: data.lat, longitude: data.lng });
+      };
+
+      socket.on("ride:status", handleRideStatus);
+      socket.on("driver:location", handleDriverLocation);
+
+      cleanupFn = () => {
+        socket.off("ride:status", handleRideStatus);
+        socket.off("driver:location", handleDriverLocation);
+      };
+
+      return true;
     };
 
-    const handleDriverLocation = (data: { lat: number; lng: number }) => {
-      setDriverLocation({ latitude: data.lat, longitude: data.lng });
-    };
-
-    socket.on("ride:status_changed", handleStatusChange);
-    socket.on("driver:location", handleDriverLocation);
+    if (!tryConnect()) {
+      retryInterval = setInterval(() => {
+        if (tryConnect() && retryInterval) {
+          clearInterval(retryInterval);
+          retryInterval = null;
+        }
+      }, 1500);
+    }
 
     return () => {
-      socket.off("ride:status_changed", handleStatusChange);
-      socket.off("driver:location", handleDriverLocation);
+      cleanupFn?.();
+      if (retryInterval) clearInterval(retryInterval);
     };
   }, [ride?.id]);
 

@@ -1,12 +1,19 @@
 import { getIO } from "../socket";
+import db from "../db";
 import type { RideStatus } from "../types/db";
 import * as notifications from "../services/notification.service";
 
 /**
  * Broadcast a ride status change to all interested parties.
  * Called after every status transition in ride.service.ts.
+ *
+ * Sends to:
+ *  - ride:{rideId} room (participants who joined)
+ *  - user:{customerId} room (always reaches the customer)
+ *  - user:{driverUserId} room (always reaches the driver)
+ *  - admin room
  */
-export function broadcastRideStatus(
+export async function broadcastRideStatus(
   rideId: string,
   oldStatus: RideStatus | null,
   newStatus: RideStatus,
@@ -23,11 +30,27 @@ export function broadcastRideStatus(
       ...rideData,
     };
 
-    // Broadcast to ride room (customer + driver)
+    // 1. Broadcast to ride room (anyone who joined this ride's room)
     io.to(`ride:${rideId}`).emit("ride:status", payload);
 
-    // Broadcast to admin room
+    // 2. Broadcast to admin room
     io.to("admin").emit("ride:status", payload);
+
+    // 3. Broadcast directly to the customer's user room
+    const customerId = rideData?.customer_id as string | undefined;
+    if (customerId) {
+      io.to(`user:${customerId}`).emit("ride:status", payload);
+    }
+
+    // 4. Broadcast directly to the driver's user room
+    const driverId = rideData?.driver_id as string | undefined;
+    if (driverId) {
+      // driver_id is the drivers table ID, we need the user_id
+      const driver = await db("drivers").where("id", driverId).select("user_id").first();
+      if (driver) {
+        io.to(`user:${driver.user_id}`).emit("ride:status", payload);
+      }
+    }
   } catch {
     // Socket.io not initialized (e.g. in tests) — silently skip
   }
@@ -52,7 +75,6 @@ async function sendStatusPushNotifications(
   if (!rideData) return;
 
   const customerId = rideData.customer_id as string | undefined;
-  const driverId = rideData.driver_id as string | undefined;
   const rideId = rideData.id as string | undefined;
 
   // Notify customer on status changes

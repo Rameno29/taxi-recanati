@@ -38,6 +38,11 @@ export default {
     vehicleVan: "Van",
     immediate: "Adesso",
     reservation: "Prenotazione",
+    searchPickup: "Cerca indirizzo di partenza...",
+    searchDestination: "Cerca destinazione...",
+    yourLocation: "La tua posizione",
+    pickDate: "Scegli data",
+    pickTime: "Scegli ora",
   },
   ride: {
     status: "Stato corsa",

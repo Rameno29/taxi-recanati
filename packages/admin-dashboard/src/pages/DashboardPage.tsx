@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../services/api";
+import { onRideStatus, onDriverLocation } from "../services/socket";
 
 interface Stats {
   rides: {
@@ -32,17 +33,36 @@ function getValue(stats: Stats, path: string): number {
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
-
-  useEffect(() => {
-    fetchStats();
-    const interval = setInterval(fetchStats, 15000);
-    return () => clearInterval(interval);
-  }, []);
+  const [lastEvent, setLastEvent] = useState<string | null>(null);
 
   const fetchStats = async () => {
     const res = await api.get("/api/admin/stats");
     if (res.ok) setStats(await res.json());
   };
+
+  useEffect(() => {
+    fetchStats();
+    // Fallback polling every 30s (socket handles instant updates)
+    const interval = setInterval(fetchStats, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Real-time: re-fetch stats on any ride status change
+  useEffect(() => {
+    const offRide = onRideStatus((data) => {
+      setLastEvent(`Corsa ${data.ride_id.slice(0, 8)}… → ${data.new_status}`);
+      fetchStats(); // instant refresh
+      // Clear event toast after 4s
+      setTimeout(() => setLastEvent(null), 4000);
+    });
+
+    const offLocation = onDriverLocation(() => {
+      // Driver location changes can affect "busy" count
+      // Debounce: don't re-fetch on every GPS ping, just on ride events
+    });
+
+    return () => { offRide?.(); offLocation?.(); };
+  }, []);
 
   if (!stats)
     return (
@@ -53,7 +73,15 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <h2 style={styles.pageTitle}>Dashboard</h2>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+        <h2 style={styles.pageTitle}>Dashboard</h2>
+        {lastEvent && (
+          <div style={styles.toast}>
+            <span style={styles.toastDot} />
+            {lastEvent}
+          </div>
+        )}
+      </div>
       <div style={styles.grid}>
         {CARDS.map((card) => {
           const val = getValue(stats, card.path);
@@ -75,7 +103,7 @@ export default function DashboardPage() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  pageTitle: { fontSize: 24, fontWeight: 700, color: "#1E2A5E", marginBottom: 24, marginTop: 0 },
+  pageTitle: { fontSize: 24, fontWeight: 700, color: "#1E2A5E", marginBottom: 0, marginTop: 0 },
   grid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
@@ -86,6 +114,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 12,
     padding: "20px 22px",
     boxShadow: "0 1px 6px rgba(0,0,0,0.06)",
+    transition: "transform 0.15s, box-shadow 0.15s",
   },
   cardHeader: {
     display: "flex",
@@ -104,4 +133,23 @@ const styles: Record<string, React.CSSProperties> = {
   },
   cardLabel: { fontSize: 13, color: "#888", fontWeight: 500 },
   cardValue: { fontSize: 32, fontWeight: 700 },
+  toast: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    background: "#E8F5E9",
+    color: "#2E7D32",
+    padding: "8px 16px",
+    borderRadius: 20,
+    fontSize: 13,
+    fontWeight: 600,
+    animation: "fadeIn 0.3s ease",
+  },
+  toastDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    background: "#4CAF50",
+    animation: "pulse 1s infinite",
+  },
 };

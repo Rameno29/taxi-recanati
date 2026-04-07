@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { getToken } from "./services/api";
+import { connectSocket, disconnectSocket } from "./services/socket";
 import Layout from "./components/Layout";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -10,7 +12,16 @@ import AnalyticsPage from "./pages/AnalyticsPage";
 import AuditPage from "./pages/AuditPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  return getToken() ? <>{children}</> : <Navigate to="/login" replace />;
+  const token = getToken();
+
+  useEffect(() => {
+    if (token) {
+      try { connectSocket(); } catch { /* no token yet */ }
+    }
+    return () => { disconnectSocket(); };
+  }, [token]);
+
+  return token ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
 export default function App() {

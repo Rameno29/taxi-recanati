@@ -61,7 +61,7 @@ export async function checkFixedRoute(
 export function calculateFare(
   distanceMeters: number,
   durationSeconds: number,
-  vehicleType: "standard" | "monovolume",
+  vehicleType: string,
   pricingRule: PricingRuleRow
 ): FareBreakdown {
   const distanceKm = distanceMeters / 1000;

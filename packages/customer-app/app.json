@@ -1,6 +1,7 @@
 {
   "expo": {
     "name": "Taxi Recanati",
+    "entryPoint": "./index.ts",
     "slug": "taxi-recanati-customer",
     "scheme": "taxirecanati",
     "version": "1.0.0",
@@ -43,8 +44,7 @@
       ["expo-notifications", {
         "icon": "./assets/icon.png",
         "color": "#4357AD"
-      }],
-      "@stripe/stripe-react-native"
+      }]
     ]
   }
 }

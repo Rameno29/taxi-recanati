@@ -106,6 +106,9 @@ export async function createRide(customerId: string, input: RideCreateInput) {
     changed_by_system: false,
   });
 
+  // Broadcast new ride to admin dashboard (real-time)
+  broadcastRideStatus(ride.id, null, "pending", ride);
+
   // Auto-dispatch for immediate rides
   let dispatchResult = null;
   if (input.type === "immediate") {

@@ -151,9 +151,12 @@ export async function seed(knex: Knex): Promise<void> {
     vehicle_model: "Fiat Tipo",
     vehicle_color: "Grey",
     max_capacity: 4,
-    status: "offline",
+    status: "available",
     is_verified: true,
     service_zone: recanatiZoneId,
+    current_lat: 43.4060,
+    current_lng: 13.5530,
+    last_location_at: new Date(),
   });
 
   // ── Fixed routes ──
@@ -183,7 +186,7 @@ export async function seed(knex: Knex): Promise<void> {
     minimum_fare: 8.0,
     cancellation_fee: 5.0,
     reservation_fee: 3.0,
-    vehicle_type_multiplier: JSON.stringify({ standard: 1.0, monovolume: 1.3 }),
+    vehicle_type_multiplier: JSON.stringify({ standard: 1.0, monovolume: 1.3, premium: 1.5, van: 1.4 }),
     updated_by: adminId,
   });
 

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { login } from "../services/auth";
+import { connectSocket } from "../services/socket";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
+      connectSocket(); // Connect WebSocket right after login
       navigate("/");
     } catch (err: any) {
       setError(err.message);

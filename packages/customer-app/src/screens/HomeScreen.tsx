@@ -1,17 +1,20 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   Alert,
-  ScrollView,
+  Keyboard,
+  Platform,
 } from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import * as ExpoLocation from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
 import LiveMap from "../components/LiveMap";
 import PaymentSheet from "../components/PaymentSheet";
+import AddressSearch from "../components/AddressSearch";
+import type { AddressSuggestion } from "../components/AddressSearch";
 import { useTranslation } from "react-i18next";
 import { api } from "../services/api";
 import { colors, spacing, radii, shadows } from "../theme";
@@ -52,6 +55,9 @@ export default function HomeScreen({ navigation }: Props) {
   const [selectingPoint, setSelectingPoint] = useState<"pickup" | "destination">("pickup");
   const [pendingRideId, setPendingRideId] = useState<string | null>(null);
   const [showPayment, setShowPayment] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState<Date>(new Date(Date.now() + 3600000)); // 1h from now
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -61,7 +67,7 @@ export default function HomeScreen({ navigation }: Props) {
       const pos = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
       setUserLocation(pos);
       setPickup(pos);
-      setPickupAddress("La tua posizione");
+      setPickupAddress(t("home.yourLocation"));
     })();
   }, []);
 
@@ -76,6 +82,26 @@ export default function HomeScreen({ navigation }: Props) {
       setDestinationAddress(`${coord.latitude.toFixed(4)}, ${coord.longitude.toFixed(4)}`);
     }
     setFareEstimate(null);
+  };
+
+  const handlePickupSelect = (suggestion: AddressSuggestion) => {
+    const coord = {
+      latitude: parseFloat(suggestion.lat),
+      longitude: parseFloat(suggestion.lon),
+    };
+    setPickup(coord);
+    setSelectingPoint("destination");
+    setFareEstimate(null);
+  };
+
+  const handleDestinationSelect = (suggestion: AddressSuggestion) => {
+    const coord = {
+      latitude: parseFloat(suggestion.lat),
+      longitude: parseFloat(suggestion.lon),
+    };
+    setDestination(coord);
+    setFareEstimate(null);
+    Keyboard.dismiss();
   };
 
   const navigateToTracking = () => {
@@ -102,6 +128,7 @@ export default function HomeScreen({ navigation }: Props) {
         destination_address: destinationAddress,
         type: rideType,
         vehicle_type: vehicleType,
+        ...(rideType === "reservation" ? { scheduled_at: scheduledDate.toISOString() } : {}),
       });
 
       if (!res.ok) {
@@ -115,12 +142,14 @@ export default function HomeScreen({ navigation }: Props) {
 
       const rideId = data.ride?.id || data.id;
 
-      // If there is a fare estimate, trigger payment authorization before navigating
-      if (fare && Number(fare) > 0) {
+      // Skip payment in dev mode (Stripe requires native modules / EAS build)
+      // In production, this will trigger the PaymentSheet
+      if (__DEV__) {
+        navigateToTracking();
+      } else if (fare && Number(fare) > 0) {
         setPendingRideId(rideId);
         setShowPayment(true);
       } else {
-        // No fare — go straight to tracking
         navigateToTracking();
       }
     } catch (err: any) {
@@ -175,35 +204,35 @@ export default function HomeScreen({ navigation }: Props) {
         ]}
       />
 
-      <View style={styles.panel}>
-        {/* Location indicators */}
-        <View style={styles.locationRow}>
-          <Ionicons
-            name="location"
-            size={20}
-            color={selectingPoint === "pickup" ? colors.primaryBlue : colors.success}
-          />
-          <Text
-            style={[styles.locationText, selectingPoint === "pickup" && styles.locationTextActive]}
-            numberOfLines={1}
-          >
-            {t("home.pickup")}: {pickupAddress || t("home.whereToGo")}
-          </Text>
+      {/* Address search overlay — sits on top of the map so keyboard doesn't cover it */}
+      <View style={styles.searchOverlay} pointerEvents="box-none">
+        <View style={styles.searchCard}>
+          <View style={{ zIndex: 20 }}>
+            <AddressSearch
+              placeholder={t("home.pickup")}
+              value={pickupAddress}
+              onChangeText={setPickupAddress}
+              onSelect={handlePickupSelect}
+              icon="location"
+              iconColor={colors.success}
+              clearOnFocus
+            />
+          </View>
+          <View style={{ zIndex: 10, marginTop: spacing.sm }}>
+            <AddressSearch
+              placeholder={t("home.destination")}
+              value={destinationAddress}
+              onChangeText={setDestinationAddress}
+              onSelect={handleDestinationSelect}
+              icon="flag"
+              iconColor={colors.accentCoral}
+              autoFocus={false}
+            />
+          </View>
         </View>
-        <View style={styles.locationRow}>
-          <Ionicons
-            name="flag"
-            size={20}
-            color={selectingPoint === "destination" ? colors.primaryBlue : colors.accentCoral}
-          />
-          <Text
-            style={[styles.locationText, selectingPoint === "destination" && styles.locationTextActive]}
-            numberOfLines={1}
-          >
-            {t("home.destination")}: {destinationAddress || t("home.whereToGo")}
-          </Text>
-        </View>
+      </View>
 
+      <View style={styles.panel}>
         {/* Vehicle type selector */}
         <View style={styles.vehicleRow}>
           {vehicleOptions.map((v) => (
@@ -257,6 +286,52 @@ export default function HomeScreen({ navigation }: Props) {
           </TouchableOpacity>
         </View>
 
+        {/* Date/time picker for reservations */}
+        {rideType === "reservation" && (
+          <View style={styles.dateTimeRow}>
+            <TouchableOpacity
+              style={styles.dateTimeBtn}
+              onPress={() => setShowDatePicker(true)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="calendar" size={16} color={colors.primaryBlue} />
+              <Text style={styles.dateTimeText}>
+                {scheduledDate.toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" })}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.dateTimeBtn}
+              onPress={() => setShowTimePicker(true)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="time" size={16} color={colors.primaryBlue} />
+              <Text style={styles.dateTimeText}>
+                {scheduledDate.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {(showDatePicker || showTimePicker) && (
+          <DateTimePicker
+            value={scheduledDate}
+            mode={showDatePicker ? "date" : "time"}
+            is24Hour
+            minimumDate={new Date()}
+            onChange={(event, date) => {
+              setShowDatePicker(false);
+              setShowTimePicker(false);
+              if (date && event.type !== "dismissed") {
+                setScheduledDate(date);
+                // On Android, show time picker right after date picker
+                if (showDatePicker && Platform.OS === "android") {
+                  setTimeout(() => setShowTimePicker(true), 300);
+                }
+              }
+            }}
+          />
+        )}
+
         {fareEstimate !== null && (
           <Text style={styles.fare}>
             {t("home.estimatedFare")}: €{Number(fareEstimate).toFixed(2)}
@@ -289,29 +364,32 @@ export default function HomeScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  map: { flex: 1 },
+  map: { ...StyleSheet.absoluteFillObject },
+  searchOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    paddingTop: 54, // safe area for status bar
+    paddingHorizontal: spacing.md,
+  },
+  searchCard: {
+    backgroundColor: colors.white,
+    borderRadius: radii.lg,
+    padding: spacing.sm + 2,
+    ...shadows.card,
+  },
   panel: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
     backgroundColor: colors.white,
     padding: spacing.md,
     borderTopLeftRadius: radii.xl,
     borderTopRightRadius: radii.xl,
     ...shadows.panel,
-  },
-  locationRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    gap: spacing.sm,
-  },
-  locationText: {
-    flex: 1,
-    fontSize: 14,
-    color: colors.bodyText,
-  },
-  locationTextActive: {
-    color: colors.primaryBlue,
-    fontWeight: "600",
   },
   vehicleRow: {
     flexDirection: "row",
@@ -375,4 +453,27 @@ const styles = StyleSheet.create({
   },
   bookButtonDisabled: { opacity: 0.5 },
   bookButtonText: { fontSize: 18, fontWeight: "bold", color: colors.white },
+  dateTimeRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  dateTimeBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: radii.sm,
+    backgroundColor: colors.primaryBlue + "10",
+    borderWidth: 1.5,
+    borderColor: colors.primaryBlue + "30",
+  },
+  dateTimeText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.primaryBlue,
+  },
 });
