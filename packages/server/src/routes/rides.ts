@@ -145,11 +145,37 @@ router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
 router.patch("/:id/status", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = updateStatusSchema.parse(req.body);
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+
+    // ── Authorization check: only participants or admins can update ──
+    const existingRide = await rideService.getRideById(req.params.id as string);
+    if (!existingRide) {
+      throw new AppError(404, "Ride not found");
+    }
+
+    if (role === "customer") {
+      // Customers can only cancel their own rides
+      if (existingRide.customer_id !== userId) {
+        throw new AppError(403, "Not authorized to update this ride");
+      }
+      if (data.status !== "cancelled") {
+        throw new AppError(403, "Customers can only cancel rides");
+      }
+    } else if (role === "driver") {
+      // Drivers can only update rides assigned to them
+      const isAssignedDriver = existingRide.driver_user_id === userId;
+      if (!isAssignedDriver) {
+        throw new AppError(403, "Not authorized to update this ride");
+      }
+    }
+    // Admins can update any ride
+
     const ride = await rideService.updateRideStatus(
       req.params.id as string,
       data,
-      req.user!.userId,
-      req.user!.role
+      userId,
+      role
     );
     res.json(ride);
   } catch (err) {

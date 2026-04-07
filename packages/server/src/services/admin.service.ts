@@ -147,7 +147,7 @@ export async function getRevenueAnalytics(period: "week" | "month" | "year" = "m
   // Daily revenue for the period
   const dailyRevenue = await db("rides")
     .where("status", "completed")
-    .whereRaw(`completed_at >= NOW() - INTERVAL '${interval}'`)
+    .whereRaw("completed_at >= NOW() - INTERVAL ?", [interval])
     .select(
       db.raw("DATE(completed_at) as date"),
       db.raw("COUNT(*) as rides"),
@@ -160,7 +160,7 @@ export async function getRevenueAnalytics(period: "week" | "month" | "year" = "m
   // Totals for the period
   const [totals] = await db("rides")
     .where("status", "completed")
-    .whereRaw(`completed_at >= NOW() - INTERVAL '${interval}'`)
+    .whereRaw("completed_at >= NOW() - INTERVAL ?", [interval])
     .select(
       db.raw("COUNT(*) as total_rides"),
       db.raw("COALESCE(SUM(fare_final), 0) as total_revenue"),
@@ -171,21 +171,21 @@ export async function getRevenueAnalytics(period: "week" | "month" | "year" = "m
 
   // Rides by status for the period
   const byStatus = await db("rides")
-    .whereRaw(`created_at >= NOW() - INTERVAL '${interval}'`)
+    .whereRaw("created_at >= NOW() - INTERVAL ?", [interval])
     .select("status", db.raw("COUNT(*) as count"))
     .groupBy("status");
 
   // Rides by vehicle type
   const byVehicle = await db("rides")
     .where("status", "completed")
-    .whereRaw(`completed_at >= NOW() - INTERVAL '${interval}'`)
+    .whereRaw("completed_at >= NOW() - INTERVAL ?", [interval])
     .select("vehicle_type", db.raw("COUNT(*) as count"), db.raw("COALESCE(SUM(fare_final), 0) as revenue"))
     .groupBy("vehicle_type");
 
   // Peak hours
   const peakHours = await db("rides")
     .where("status", "completed")
-    .whereRaw(`completed_at >= NOW() - INTERVAL '${interval}'`)
+    .whereRaw("completed_at >= NOW() - INTERVAL ?", [interval])
     .select(
       db.raw("EXTRACT(HOUR FROM created_at)::int as hour"),
       db.raw("COUNT(*) as rides")
@@ -240,7 +240,7 @@ export async function getDriverPerformance(period: "week" | "month" | "year" = "
     .join("drivers as d", "r.driver_id", "d.id")
     .join("users as u", "d.user_id", "u.id")
     .where("r.status", "completed")
-    .whereRaw(`r.completed_at >= NOW() - INTERVAL '${interval}'`)
+    .whereRaw("r.completed_at >= NOW() - INTERVAL ?", [interval])
     .select(
       "d.id as driver_id",
       "u.name",

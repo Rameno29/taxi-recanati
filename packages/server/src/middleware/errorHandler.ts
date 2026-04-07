@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import { config } from "../config";
 
 export class AppError extends Error {
   constructor(
@@ -25,10 +26,15 @@ export function errorHandler(
     return;
   }
 
+  // Log full error details server-side only
   console.error("Unhandled error:", err);
+
+  // Never expose internal details to the client in production
   res.status(500).json({
     error: "InternalServerError",
     message: "An unexpected error occurred",
     statusCode: 500,
+    // Only show stack trace in development for debugging
+    ...(config.isDev && { debug: err.message }),
   });
 }

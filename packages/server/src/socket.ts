@@ -7,6 +7,30 @@ import type { TokenPayload } from "./types/api";
 
 let io: Server;
 
+// ── Socket rate limiting (per-connection) ────────────────────────────
+const socketRateMap = new Map<string, { count: number; resetAt: number }>();
+const SOCKET_RATE_WINDOW = 10_000; // 10 seconds
+const SOCKET_RATE_MAX = 50; // max 50 events per 10s per socket
+
+function checkSocketRate(socketId: string): boolean {
+  const now = Date.now();
+  const entry = socketRateMap.get(socketId);
+  if (!entry || now > entry.resetAt) {
+    socketRateMap.set(socketId, { count: 1, resetAt: now + SOCKET_RATE_WINDOW });
+    return true;
+  }
+  entry.count++;
+  return entry.count <= SOCKET_RATE_MAX;
+}
+
+// Clean up stale rate entries periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of socketRateMap) {
+    if (now > entry.resetAt) socketRateMap.delete(key);
+  }
+}, 30_000);
+
 interface AuthenticatedSocket extends Socket {
   user: TokenPayload;
   driverId?: string;
@@ -15,14 +39,20 @@ interface AuthenticatedSocket extends Socket {
 export function initializeSocket(httpServer: HttpServer): Server {
   io = new Server(httpServer, {
     cors: {
-      origin: "*",
+      origin: config.isDev
+        ? true // dev: allow all origins (Expo, browser)
+        : config.cors.allowedOrigins,
       methods: ["GET", "POST"],
+      credentials: true,
     },
     pingInterval: 25000,
     pingTimeout: 10000,
+    // ── Connection security ──────────────────────────────────────────
+    maxHttpBufferSize: 1e6, // 1MB max message size
+    connectTimeout: 10000,  // 10s connection timeout
   });
 
-  // JWT authentication middleware
+  // ── JWT authentication middleware ──────────────────────────────────
   io.use(async (socket, next) => {
     const token = socket.handshake.auth?.token || socket.handshake.query?.token;
     if (!token || typeof token !== "string") {
@@ -70,15 +100,45 @@ export function initializeSocket(httpServer: HttpServer): Server {
       socket.join(`ride:${activeRide.id}`);
     }
 
-    // Allow clients to join a ride room dynamically
-    socket.on("join:ride", (rideId: string) => {
-      if (typeof rideId === "string" && rideId.length > 0) {
+    // ── Authorized ride room join ────────────────────────────────────
+    // Verify the user is actually a participant before allowing room join
+    socket.on("join:ride", async (rideId: string) => {
+      if (typeof rideId !== "string" || rideId.length === 0) return;
+
+      // Rate limit socket events
+      if (!checkSocketRate(socket.id)) {
+        socket.emit("error", { message: "Rate limit exceeded" });
+        return;
+      }
+
+      // Admins can join any ride room
+      if (role === "admin") {
         socket.join(`ride:${rideId}`);
+        return;
+      }
+
+      // Verify participation
+      try {
+        const ride = await db("rides").where("id", rideId).first();
+        if (!ride) return;
+
+        const isCustomer = ride.customer_id === userId;
+        let isDriver = false;
+        if (role === "driver" && socket.driverId) {
+          isDriver = ride.driver_id === socket.driverId;
+        }
+
+        if (isCustomer || isDriver) {
+          socket.join(`ride:${rideId}`);
+        }
+        // Silently ignore unauthorized join attempts — don't leak info
+      } catch {
+        // DB error — silently ignore
       }
     });
 
     socket.on("disconnect", () => {
-      // Cleanup handled by Socket.io automatically
+      socketRateMap.delete(socket.id);
     });
   });
 

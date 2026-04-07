@@ -27,7 +27,7 @@ export interface RideCreateInput {
   destination_lng: number;
   destination_address?: string;
   type: RideType;
-  scheduled_at?: string;
+  scheduled_at?: string | null;
   vehicle_type: VehicleType;
 }
 
