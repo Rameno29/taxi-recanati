@@ -1,4 +1,6 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
+import { MapContainer, TileLayer, Marker, Polyline, Popup } from "react-leaflet";
+import L from "leaflet";
 import { api } from "../services/api";
 import { onRideStatus } from "../services/socket";
 
@@ -10,6 +12,10 @@ interface Ride {
   license_plate: string | null;
   pickup_address: string;
   destination_address: string;
+  pickup_lat: number;
+  pickup_lng: number;
+  destination_lat: number;
+  destination_lng: number;
   status: string;
   fare_estimate: number;
   fare_final: number | null;
@@ -23,6 +29,12 @@ interface Driver {
   status: string;
 }
 
+interface RouteData {
+  coordinates: [number, number][];
+  distanceKm: string;
+  durationMin: string;
+}
+
 const STATUS_COLORS: Record<string, string> = {
   pending: "#FF9800",
   accepted: "#2196F3",
@@ -34,6 +46,56 @@ const STATUS_COLORS: Record<string, string> = {
   no_show: "#795548",
 };
 
+// Leaflet marker icons for the route map modal
+const pickupIcon = new L.Icon({
+  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
+
+const destIcon = new L.Icon({
+  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
+
+/**
+ * Fetch driving route from OSRM (free, no API key).
+ */
+async function fetchOSRMRoute(
+  pickupLat: number, pickupLng: number,
+  destLat: number, destLng: number
+): Promise<RouteData | null> {
+  try {
+    const url =
+      `https://router.project-osrm.org/route/v1/driving/` +
+      `${pickupLng},${pickupLat};${destLng},${destLat}` +
+      `?overview=full&geometries=geojson`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.code !== "Ok" || !data.routes?.length) return null;
+    const route = data.routes[0];
+    // GeoJSON coordinates are [lng, lat] — Leaflet wants [lat, lng]
+    const coordinates: [number, number][] = route.geometry.coordinates.map(
+      ([lng, lat]: [number, number]) => [lat, lng]
+    );
+    return {
+      coordinates,
+      distanceKm: (route.distance / 1000).toFixed(1),
+      durationMin: Math.round(route.duration / 60).toString(),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export default function RidesPage() {
   const [rides, setRides] = useState<Ride[]>([]);
   const [total, setTotal] = useState(0);
@@ -41,6 +103,11 @@ export default function RidesPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [availableDrivers, setAvailableDrivers] = useState<Driver[]>([]);
   const [dispatchRideId, setDispatchRideId] = useState<string | null>(null);
+
+  // Route map modal state
+  const [mapRide, setMapRide] = useState<Ride | null>(null);
+  const [routeData, setRouteData] = useState<RouteData | null>(null);
+  const [routeLoading, setRouteLoading] = useState(false);
 
   useEffect(() => {
     fetchRides();
@@ -66,7 +133,7 @@ export default function RidesPage() {
   };
 
   const handleRefund = async (rideId: string) => {
-    const amount = prompt("Importo rimborso in centesimi (vuoto = rimborso totale):");
+    const amount = prompt("Importo rimborso (€):");
     if (amount === null) return;
     const body = amount ? { amount: Number(amount) } : {};
     const res = await api.post(`/api/admin/rides/${rideId}/refund`, body);
@@ -92,6 +159,24 @@ export default function RidesPage() {
       setDispatchRideId(null);
       fetchRides();
     }
+  };
+
+  // Open route map modal for a ride
+  const openRouteMap = async (ride: Ride) => {
+    setMapRide(ride);
+    setRouteData(null);
+    setRouteLoading(true);
+    const route = await fetchOSRMRoute(
+      Number(ride.pickup_lat), Number(ride.pickup_lng),
+      Number(ride.destination_lat), Number(ride.destination_lng)
+    );
+    setRouteData(route);
+    setRouteLoading(false);
+  };
+
+  const closeRouteMap = () => {
+    setMapRide(null);
+    setRouteData(null);
   };
 
   const statuses = ["", "pending", "accepted", "arriving", "in_progress", "completed", "cancelled"];
@@ -174,20 +259,30 @@ export default function RidesPage() {
                 <td style={{ ...styles.td, fontWeight: 700, color: "#1E2A5E" }}>
                   €{Number(r.fare_final || r.fare_estimate).toFixed(2)}
                 </td>
-                <td style={{ ...styles.td, display: "flex", gap: 6 }}>
-                  {r.status === "pending" && !r.driver_name && (
-                    <button style={styles.actionBtn} onClick={() => openDispatch(r.id)}>
-                      Assegna
-                    </button>
-                  )}
-                  {r.status === "completed" && (
+                <td style={{ ...styles.td }}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    {/* Map button — always visible */}
                     <button
-                      style={{ ...styles.actionBtn, background: "#F44336" }}
-                      onClick={() => handleRefund(r.id)}
+                      style={{ ...styles.actionBtn, background: "#4357AD" }}
+                      onClick={() => openRouteMap(r)}
+                      title="Visualizza percorso"
                     >
-                      Rimborso
+                      🗺️ Mappa
                     </button>
-                  )}
+                    {r.status === "pending" && !r.driver_name && (
+                      <button style={styles.actionBtn} onClick={() => openDispatch(r.id)}>
+                        Assegna
+                      </button>
+                    )}
+                    {r.status === "completed" && (
+                      <button
+                        style={{ ...styles.actionBtn, background: "#F44336" }}
+                        onClick={() => handleRefund(r.id)}
+                      >
+                        Rimborso
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -205,6 +300,7 @@ export default function RidesPage() {
         </button>
       </div>
 
+      {/* Dispatch modal */}
       {dispatchRideId && (
         <div style={styles.overlay}>
           <div style={styles.modal}>
@@ -223,6 +319,90 @@ export default function RidesPage() {
             <button style={styles.cancelBtn} onClick={() => setDispatchRideId(null)}>
               Annulla
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Route map modal */}
+      {mapRide && (
+        <div style={styles.overlay} onClick={closeRouteMap}>
+          <div
+            style={styles.mapModal}
+            onClick={(e) => e.stopPropagation()} // prevent close on map click
+          >
+            <div style={styles.mapModalHeader}>
+              <div>
+                <h3 style={{ margin: 0, color: "#1E2A5E", fontSize: 18 }}>
+                  Percorso corsa
+                </h3>
+                <p style={{ margin: "4px 0 0", color: "#888", fontSize: 13 }}>
+                  {mapRide.customer_name} · {new Date(mapRide.created_at).toLocaleDateString("it")}
+                  {routeData && (
+                    <span style={{ marginLeft: 12, color: "#4357AD", fontWeight: 600 }}>
+                      {routeData.distanceKm} km · ~{routeData.durationMin} min
+                    </span>
+                  )}
+                </p>
+              </div>
+              <button style={styles.mapCloseBtn} onClick={closeRouteMap}>✕</button>
+            </div>
+
+            <div style={styles.mapAddresses}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ ...styles.addressDot, background: "#4CAF50" }} />
+                <span style={{ fontSize: 13, color: "#333" }}>{mapRide.pickup_address || "Partenza"}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ ...styles.addressDot, background: "#F44336" }} />
+                <span style={{ fontSize: 13, color: "#333" }}>{mapRide.destination_address || "Destinazione"}</span>
+              </div>
+            </div>
+
+            <div style={{ flex: 1, borderRadius: 12, overflow: "hidden", position: "relative" }}>
+              {routeLoading && (
+                <div style={styles.mapLoading}>
+                  <span>Caricamento percorso...</span>
+                </div>
+              )}
+              <MapContainer
+                center={[
+                  (Number(mapRide.pickup_lat) + Number(mapRide.destination_lat)) / 2,
+                  (Number(mapRide.pickup_lng) + Number(mapRide.destination_lng)) / 2,
+                ]}
+                zoom={13}
+                style={{ height: "100%", width: "100%" }}
+                scrollWheelZoom={true}
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                <Marker
+                  position={[Number(mapRide.pickup_lat), Number(mapRide.pickup_lng)]}
+                  icon={pickupIcon}
+                >
+                  <Popup>
+                    <strong>Partenza</strong><br />
+                    {mapRide.pickup_address}
+                  </Popup>
+                </Marker>
+                <Marker
+                  position={[Number(mapRide.destination_lat), Number(mapRide.destination_lng)]}
+                  icon={destIcon}
+                >
+                  <Popup>
+                    <strong>Destinazione</strong><br />
+                    {mapRide.destination_address}
+                  </Popup>
+                </Marker>
+                {routeData && routeData.coordinates.length >= 2 && (
+                  <Polyline
+                    positions={routeData.coordinates}
+                    pathOptions={{ color: "#4357AD", weight: 5, opacity: 0.8 }}
+                  />
+                )}
+              </MapContainer>
+            </div>
           </div>
         </div>
       )}
@@ -280,6 +460,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     fontSize: 12,
     fontWeight: 600,
+    whiteSpace: "nowrap",
   },
   pagination: {
     display: "flex",
@@ -335,5 +516,67 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     width: "100%",
     fontWeight: 600,
+  },
+  // Route map modal styles
+  mapModal: {
+    background: "#fff",
+    borderRadius: 16,
+    padding: 24,
+    width: "90vw",
+    maxWidth: 800,
+    height: "80vh",
+    maxHeight: 700,
+    display: "flex",
+    flexDirection: "column",
+    boxShadow: "0 16px 48px rgba(0,0,0,0.25)",
+  },
+  mapModalHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  mapCloseBtn: {
+    background: "#F0F1F5",
+    border: "none",
+    borderRadius: 8,
+    width: 36,
+    height: 36,
+    fontSize: 18,
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#666",
+    flexShrink: 0,
+  },
+  mapAddresses: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 6,
+    padding: "10px 12px",
+    background: "#F7F8FC",
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+  addressDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    flexShrink: 0,
+  },
+  mapLoading: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: "rgba(255,255,255,0.8)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1000,
+    fontSize: 14,
+    color: "#666",
   },
 };

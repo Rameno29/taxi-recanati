@@ -58,8 +58,9 @@ function MainTabs() {
         tabBarStyle: {
           backgroundColor: colors.white,
           borderTopColor: colors.border,
-          paddingBottom: 4,
-          height: 56,
+          paddingBottom: 8,
+          paddingTop: 6,
+          height: 64,
         },
         tabBarIcon: ({ focused, color, size }) => {
           const icons = TAB_ICONS[route.name];
@@ -71,7 +72,7 @@ function MainTabs() {
       <MainTab.Screen
         name="Home"
         component={HomeScreen}
-        options={{ title: t("tabs.home"), tabBarLabel: t("tabs.home") }}
+        options={{ headerShown: false, tabBarLabel: t("tabs.home") }}
       />
       <MainTab.Screen
         name="Tracking"

@@ -14,7 +14,7 @@ import {
   checkFixedRoute,
 } from "./pricing.service";
 import { runAutoDispatch } from "./dispatch.service";
-import { broadcastRideStatus } from "../handlers/ride.handler";
+import { broadcastRideStatus, broadcastDriverStatus } from "../handlers/ride.handler";
 import { capturePayment } from "./payment.service";
 
 // Approximate distance using Haversine formula (for estimates without Google Maps API)
@@ -162,6 +162,7 @@ export async function updateRideStatus(
           updatePayload.driver_id = driver.id;
           // Update driver status to busy
           await trx("drivers").where("id", driver.id).update({ status: "busy" });
+          broadcastDriverStatus(driver.id, userId, "busy");
         }
         updatePayload.accepted_at = now;
         break;
@@ -178,6 +179,8 @@ export async function updateRideStatus(
         // Release driver
         if (ride.driver_id) {
           await trx("drivers").where("id", ride.driver_id).update({ status: "available" });
+          const drvCompleted = await trx("drivers").where("id", ride.driver_id).select("user_id").first();
+          if (drvCompleted) broadcastDriverStatus(ride.driver_id, drvCompleted.user_id, "available");
         }
         break;
       case "cancelled":
@@ -187,6 +190,8 @@ export async function updateRideStatus(
         // Release driver if assigned
         if (ride.driver_id) {
           await trx("drivers").where("id", ride.driver_id).update({ status: "available" });
+          const drvCancelled = await trx("drivers").where("id", ride.driver_id).select("user_id").first();
+          if (drvCancelled) broadcastDriverStatus(ride.driver_id, drvCancelled.user_id, "available");
         }
         break;
       case "no_show":
@@ -196,6 +201,8 @@ export async function updateRideStatus(
         // Release driver
         if (ride.driver_id) {
           await trx("drivers").where("id", ride.driver_id).update({ status: "available" });
+          const drvNoShow = await trx("drivers").where("id", ride.driver_id).select("user_id").first();
+          if (drvNoShow) broadcastDriverStatus(ride.driver_id, drvNoShow.user_id, "available");
         }
         break;
     }
@@ -353,6 +360,9 @@ export async function rateRide(
       rated_at: new Date(),
     })
     .returning("*");
+
+  // Broadcast rating to admin and driver
+  broadcastRideStatus(rideId, "completed" as any, "completed" as any, updatedRide);
 
   return updatedRide;
 }

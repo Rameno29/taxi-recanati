@@ -67,12 +67,23 @@ export function DriverProvider({ children }: { children: React.ReactNode }) {
         }
       };
 
+      // Listen for admin forcing driver status change (online/offline)
+      const handleDriverStatus = (data: any) => {
+        const newStatus = data.status;
+        if (newStatus) {
+          setIsOnline(newStatus !== "offline");
+          setDriver((prev) => prev ? { ...prev, status: newStatus } : null);
+        }
+      };
+
       socket.on("ride:request", handleRideRequest);
       socket.on("ride:status", handleStatusChange);
+      socket.on("driver:status", handleDriverStatus);
 
       return () => {
         socket.off("ride:request", handleRideRequest);
         socket.off("ride:status", handleStatusChange);
+        socket.off("driver:status", handleDriverStatus);
       };
     };
 

@@ -89,6 +89,39 @@ async function sendStatusPushNotifications(
 }
 
 /**
+ * Broadcast a driver status change to all interested parties.
+ * Sends to:
+ *  - user:{driverUserId} room (the driver themselves)
+ *  - admin room (dashboard updates)
+ */
+export function broadcastDriverStatus(
+  driverId: string,
+  userId: string,
+  newStatus: string,
+  driverData?: Record<string, unknown>
+) {
+  try {
+    const io = getIO();
+
+    const payload = {
+      driver_id: driverId,
+      user_id: userId,
+      status: newStatus,
+      timestamp: new Date().toISOString(),
+      ...driverData,
+    };
+
+    // Notify the driver's own socket
+    io.to(`user:${userId}`).emit("driver:status", payload);
+
+    // Notify admin dashboard
+    io.to("admin").emit("driver:status", payload);
+  } catch {
+    // Socket.io not initialized (e.g. in tests) — silently skip
+  }
+}
+
+/**
  * Send a ride request to a specific driver via their socket room.
  */
 export function sendRideRequest(

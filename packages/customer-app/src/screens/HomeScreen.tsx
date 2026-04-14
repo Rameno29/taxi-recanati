@@ -11,12 +11,14 @@ import {
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as ExpoLocation from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import LiveMap from "../components/LiveMap";
 import PaymentSheet from "../components/PaymentSheet";
 import AddressSearch from "../components/AddressSearch";
 import type { AddressSuggestion } from "../components/AddressSearch";
 import { useTranslation } from "react-i18next";
 import { api } from "../services/api";
+import { fetchRoute } from "../services/routing";
 import { colors, spacing, radii, shadows } from "../theme";
 import type { Location } from "../types";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
@@ -43,6 +45,7 @@ const VEHICLE_ICONS: Record<VehicleType, keyof typeof Ionicons.glyphMap> = {
 
 export default function HomeScreen({ navigation }: Props) {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const [userLocation, setUserLocation] = useState<Location | null>(null);
   const [pickup, setPickup] = useState<Location | null>(null);
   const [destination, setDestination] = useState<Location | null>(null);
@@ -58,6 +61,8 @@ export default function HomeScreen({ navigation }: Props) {
   const [scheduledDate, setScheduledDate] = useState<Date>(new Date(Date.now() + 3600000)); // 1h from now
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [routeCoords, setRouteCoords] = useState<{ latitude: number; longitude: number }[]>([]);
+  const [routeInfo, setRouteInfo] = useState<{ km: string; min: string } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -70,6 +75,32 @@ export default function HomeScreen({ navigation }: Props) {
       setPickupAddress(t("home.yourLocation"));
     })();
   }, []);
+
+  // Fetch driving route when both pickup and destination are set
+  useEffect(() => {
+    if (!pickup || !destination) {
+      setRouteCoords([]);
+      setRouteInfo(null);
+      return;
+    }
+
+    let cancelled = false;
+    fetchRoute(
+      pickup.latitude, pickup.longitude,
+      destination.latitude, destination.longitude
+    ).then((result) => {
+      if (cancelled) return;
+      if (result) {
+        setRouteCoords(result.coordinates);
+        setRouteInfo({
+          km: (result.distanceMeters / 1000).toFixed(1),
+          min: Math.round(result.durationSeconds / 60).toString(),
+        });
+      }
+    });
+
+    return () => { cancelled = true; };
+  }, [pickup?.latitude, pickup?.longitude, destination?.latitude, destination?.longitude]);
 
   const handleMapPress = (e: any) => {
     const coord = e.nativeEvent.coordinate;
@@ -194,6 +225,7 @@ export default function HomeScreen({ navigation }: Props) {
         initialRegion={RECANATI}
         showUserLocation
         onPress={handleMapPress}
+        routeCoordinates={routeCoords}
         markers={[
           ...(pickup
             ? [{ coordinate: pickup, color: "green", title: t("home.pickup") }]
@@ -205,7 +237,7 @@ export default function HomeScreen({ navigation }: Props) {
       />
 
       {/* Address search overlay — sits on top of the map so keyboard doesn't cover it */}
-      <View style={styles.searchOverlay} pointerEvents="box-none">
+      <View style={[styles.searchOverlay, { paddingTop: insets.top + 4 }]} pointerEvents="box-none">
         <View style={styles.searchCard}>
           <View style={{ zIndex: 20 }}>
             <AddressSearch
@@ -232,7 +264,21 @@ export default function HomeScreen({ navigation }: Props) {
         </View>
       </View>
 
-      <View style={styles.panel}>
+      <View style={[styles.panel, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+        {/* Route info badge */}
+        {routeInfo && (
+          <View style={styles.routeInfoRow}>
+            <View style={styles.routeInfoBadge}>
+              <Ionicons name="navigate" size={14} color={colors.primaryBlue} />
+              <Text style={styles.routeInfoText}>{routeInfo.km} km</Text>
+            </View>
+            <View style={styles.routeInfoBadge}>
+              <Ionicons name="time" size={14} color={colors.primaryBlue} />
+              <Text style={styles.routeInfoText}>~{routeInfo.min} min</Text>
+            </View>
+          </View>
+        )}
+
         {/* Vehicle type selector */}
         <View style={styles.vehicleRow}>
           {vehicleOptions.map((v) => (
@@ -371,7 +417,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 10,
-    paddingTop: 54, // safe area for status bar
+    // paddingTop set dynamically via useSafeAreaInsets()
     paddingHorizontal: spacing.md,
   },
   searchCard: {
@@ -473,6 +519,25 @@ const styles = StyleSheet.create({
   },
   dateTimeText: {
     fontSize: 14,
+    fontWeight: "600",
+    color: colors.primaryBlue,
+  },
+  routeInfoRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  routeInfoBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: colors.primaryBlue + "12",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: radii.full,
+  },
+  routeInfoText: {
+    fontSize: 13,
     fontWeight: "600",
     color: colors.primaryBlue,
   },

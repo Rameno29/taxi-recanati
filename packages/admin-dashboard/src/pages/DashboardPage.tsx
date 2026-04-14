@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../services/api";
-import { onRideStatus, onDriverLocation } from "../services/socket";
+import { onRideStatus, onDriverLocation, onDriverStatus } from "../services/socket";
 
 interface Stats {
   rides: {
@@ -57,11 +57,17 @@ export default function DashboardPage() {
     });
 
     const offLocation = onDriverLocation(() => {
-      // Driver location changes can affect "busy" count
-      // Debounce: don't re-fetch on every GPS ping, just on ride events
+      // no-op for location pings — too frequent
     });
 
-    return () => { offRide?.(); offLocation?.(); };
+    // Refresh stats when driver goes online/offline/busy
+    const offDriverStatus = onDriverStatus((data) => {
+      setLastEvent(`Autista → ${data.status}`);
+      fetchStats();
+      setTimeout(() => setLastEvent(null), 4000);
+    });
+
+    return () => { offRide?.(); offLocation?.(); offDriverStatus?.(); };
   }, []);
 
   if (!stats)

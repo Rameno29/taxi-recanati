@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import { api } from "../services/api";
-import { onDriverLocation, onRideStatus } from "../services/socket";
+import { onDriverLocation, onRideStatus, onDriverStatus } from "../services/socket";
 import type { DriverLocationEvent } from "../services/socket";
 import "leaflet/dist/leaflet.css";
 
@@ -74,7 +74,12 @@ export default function MapPage() {
       fetchPositions();
     });
 
-    return () => { offLocation?.(); offRide?.(); };
+    // Driver status changes (online/offline) — full refresh to add/remove markers
+    const offDriverStatus = onDriverStatus(() => {
+      fetchPositions();
+    });
+
+    return () => { offLocation?.(); offRide?.(); offDriverStatus?.(); };
   }, []);
 
   const available = drivers.filter((d) => d.status === "available").length;

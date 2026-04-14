@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../services/api";
-import { onRideStatus, onDriverLocation } from "../services/socket";
+import { onRideStatus, onDriverLocation, onDriverStatus } from "../services/socket";
 
 interface Driver {
   id: string;
@@ -35,11 +35,12 @@ export default function DriversPage() {
     fetchDrivers();
   }, [filter]);
 
-  // Real-time: refresh when a ride status changes (driver may go busy/available)
+  // Real-time: refresh on ride changes, driver status changes, and location updates
   useEffect(() => {
     const offRide = onRideStatus(() => { fetchDrivers(); });
-    const offLoc = onDriverLocation(() => { /* could update coords live */ });
-    return () => { offRide?.(); offLoc?.(); };
+    const offDriver = onDriverStatus(() => { fetchDrivers(); });
+    const offLoc = onDriverLocation(() => { fetchDrivers(); });
+    return () => { offRide?.(); offDriver?.(); offLoc?.(); };
   }, [filter]);
 
   const fetchDrivers = async () => {

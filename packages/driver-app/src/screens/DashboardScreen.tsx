@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import LiveMap from "../components/LiveMap";
 import { useDriver } from "../context/DriverContext";
 import { colors, spacing, radii, fonts } from "../theme";
@@ -25,6 +26,7 @@ const RECANATI = {
 
 export default function DashboardScreen({ navigation }: Props) {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const {
     isOnline,
     toggleOnline,
@@ -77,7 +79,7 @@ export default function DashboardScreen({ navigation }: Props) {
       <LiveMap style={styles.map} initialRegion={RECANATI} showUserLocation />
 
       {/* Online/Offline toggle */}
-      <View style={styles.toggleContainer}>
+      <View style={[styles.toggleContainer, { top: insets.top + 10 }]}>
         <TouchableOpacity
           style={[styles.toggleBtn, isOnline ? styles.toggleOnline : styles.toggleOffline]}
           onPress={handleToggle}
@@ -181,7 +183,7 @@ const styles = StyleSheet.create({
   map: { flex: 1 },
   toggleContainer: {
     position: "absolute",
-    top: spacing.md,
+    // top set dynamically via useSafeAreaInsets()
     alignSelf: "center",
   },
   toggleBtn: {

@@ -1,5 +1,6 @@
 import db from "../db";
 import { AppError } from "../middleware/errorHandler";
+import { broadcastDriverStatus } from "../handlers/ride.handler";
 import type { DriverStatus } from "../types/db";
 
 /**
@@ -53,6 +54,12 @@ export async function updateDriverStatus(userId: string, status: DriverStatus) {
     .where("id", driver.id)
     .update({ status })
     .returning("*");
+
+  // Broadcast status change to admin dashboard and driver's own socket
+  broadcastDriverStatus(driver.id, userId, status, {
+    name: updated.license_plate,
+    vehicle_type: updated.vehicle_type,
+  });
 
   return updated;
 }

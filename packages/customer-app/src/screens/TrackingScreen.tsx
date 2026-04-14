@@ -11,10 +11,12 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import LiveMap from "../components/LiveMap";
 import { useFocusEffect } from "@react-navigation/native";
 import { api } from "../services/api";
 import { getSocket } from "../services/socket";
+import { fetchRoute } from "../services/routing";
 import { colors, spacing, radii, shadows } from "../theme";
 import type { Ride, Location } from "../types";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
@@ -42,10 +44,12 @@ const STATUS_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
 
 export default function TrackingScreen({ navigation }: Props) {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const [ride, setRide] = useState<Ride | null>(null);
   const [driverLocation, setDriverLocation] = useState<Location | null>(null);
   const [loading, setLoading] = useState(true);
   const [rating, setRating] = useState(0);
+  const [routeCoords, setRouteCoords] = useState<{ latitude: number; longitude: number }[]>([]);
 
   const fetchActiveRide = async () => {
     try {
@@ -68,6 +72,19 @@ export default function TrackingScreen({ navigation }: Props) {
       fetchActiveRide();
     }, [])
   );
+
+  // Fetch route when ride is loaded
+  useEffect(() => {
+    if (!ride) { setRouteCoords([]); return; }
+    let cancelled = false;
+    fetchRoute(
+      Number(ride.pickup_lat), Number(ride.pickup_lng),
+      Number(ride.destination_lat), Number(ride.destination_lng)
+    ).then((result) => {
+      if (!cancelled && result) setRouteCoords(result.coordinates);
+    });
+    return () => { cancelled = true; };
+  }, [ride?.id]);
 
   // Real-time socket listener — handles ALL ride events
   // Works whether we have an active ride or not
@@ -209,6 +226,7 @@ export default function TrackingScreen({ navigation }: Props) {
       {showMap && (
         <LiveMap
           style={styles.map}
+          routeCoordinates={routeCoords}
           markers={[
             {
               coordinate: { latitude: Number(ride.pickup_lat), longitude: Number(ride.pickup_lng) },
@@ -225,7 +243,7 @@ export default function TrackingScreen({ navigation }: Props) {
         />
       )}
 
-      <View style={styles.infoPanel}>
+      <View style={[styles.infoPanel, { paddingBottom: Math.max(insets.bottom + 10, 20) }]}>
         <View style={[styles.statusBadge, { backgroundColor: STATUS_COLORS[ride.status] || "#999" }]}>
           <Ionicons
             name={STATUS_ICONS[ride.status] || "help-circle-outline"}

@@ -1,5 +1,6 @@
 import db from "../db";
 import { AppError } from "../middleware/errorHandler";
+import { broadcastDriverStatus } from "../handlers/ride.handler";
 
 /**
  * List all drivers with their user info.
@@ -128,6 +129,14 @@ export async function adminUpdateDriver(
     .where("id", driverId)
     .update(payload)
     .returning("*");
+
+  // Broadcast driver status change to driver app + admin dashboard
+  if (payload.status) {
+    broadcastDriverStatus(driverId, driver.user_id, payload.status, {
+      license_plate: updated.license_plate,
+      vehicle_type: updated.vehicle_type,
+    });
+  }
 
   return updated;
 }

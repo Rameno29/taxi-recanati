@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from "react";
 import { StyleSheet, ViewStyle } from "react-native";
-import MapView, { Marker, Region } from "react-native-maps";
+import MapView, { Marker, Polyline, Region } from "react-native-maps";
 import { colors } from "../theme";
 
 interface MarkerData {
@@ -13,6 +13,7 @@ interface LiveMapProps {
   initialRegion?: Region;
   markers?: MarkerData[];
   driverLocation?: { latitude: number; longitude: number } | null;
+  routeCoordinates?: { latitude: number; longitude: number }[];
   showUserLocation?: boolean;
   onPress?: (e: any) => void;
   style?: ViewStyle;
@@ -29,34 +30,43 @@ export default function LiveMap({
   initialRegion,
   markers = [],
   driverLocation,
+  routeCoordinates,
   showUserLocation = false,
   onPress,
   style,
 }: LiveMapProps) {
   const mapRef = useRef<MapView>(null);
 
+  // Fit map to show route, markers, and driver
   useEffect(() => {
-    if (!driverLocation || !mapRef.current) return;
+    if (!mapRef.current) return;
 
-    const coords = markers.map((m) => m.coordinate);
-    coords.push(driverLocation);
+    const allCoords: { latitude: number; longitude: number }[] = [];
 
-    if (coords.length >= 2) {
-      mapRef.current.fitToCoordinates(coords, {
-        edgePadding: { top: 60, right: 60, bottom: 60, left: 60 },
+    // Add marker coordinates
+    markers.forEach((m) => allCoords.push(m.coordinate));
+
+    // Add driver location
+    if (driverLocation) allCoords.push(driverLocation);
+
+    // Add route endpoints (first and last) for bounds
+    if (routeCoordinates && routeCoordinates.length >= 2) {
+      allCoords.push(routeCoordinates[0]);
+      allCoords.push(routeCoordinates[routeCoordinates.length - 1]);
+    }
+
+    if (allCoords.length >= 2) {
+      mapRef.current.fitToCoordinates(allCoords, {
+        edgePadding: { top: 80, right: 60, bottom: 200, left: 60 },
         animated: true,
       });
-    } else {
-      mapRef.current.animateToRegion(
-        {
-          ...driverLocation,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        },
-        500,
-      );
     }
-  }, [driverLocation?.latitude, driverLocation?.longitude]);
+  }, [
+    driverLocation?.latitude,
+    driverLocation?.longitude,
+    routeCoordinates?.length,
+    markers.length,
+  ]);
 
   return (
     <MapView
@@ -67,6 +77,16 @@ export default function LiveMap({
       showsMyLocationButton={showUserLocation}
       onPress={onPress}
     >
+      {/* Route polyline */}
+      {routeCoordinates && routeCoordinates.length >= 2 && (
+        <Polyline
+          coordinates={routeCoordinates}
+          strokeColor={colors.primaryBlue}
+          strokeWidth={4}
+          lineDashPattern={undefined}
+        />
+      )}
+
       {markers.map((m, i) => (
         <Marker
           key={`marker-${i}`}

@@ -121,3 +121,15 @@ export function onDriverLocation(cb: EventCallback<DriverLocationEvent>) {
 export function onChatMessage(cb: EventCallback<ChatMessageEvent>) {
   return on("chat:message", cb);
 }
+
+export interface DriverStatusEvent {
+  driver_id: string;
+  user_id: string;
+  status: string;
+  timestamp: string;
+  [key: string]: unknown;
+}
+
+export function onDriverStatus(cb: EventCallback<DriverStatusEvent>) {
+  return on("driver:status", cb);
+}

@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -11,9 +11,11 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import LiveMap from "../components/LiveMap";
 import { useFocusEffect } from "@react-navigation/native";
 import { useDriver } from "../context/DriverContext";
+import { fetchRoute } from "../services/routing";
 import { colors, spacing, radii, fonts } from "../theme";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { MainTabParamList } from "../navigation/AppNavigator";
@@ -28,7 +30,22 @@ const STATUS_FLOW: Record<string, { next: string; label: string; color: string; 
 
 export default function ActiveRideScreen({ navigation }: Props) {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const { activeRide, updateRideStatus, refreshActiveRide } = useDriver();
+  const [routeCoords, setRouteCoords] = useState<{ latitude: number; longitude: number }[]>([]);
+
+  // Fetch driving route when ride loads
+  useEffect(() => {
+    if (!activeRide) { setRouteCoords([]); return; }
+    let cancelled = false;
+    fetchRoute(
+      Number(activeRide.pickup_lat), Number(activeRide.pickup_lng),
+      Number(activeRide.destination_lat), Number(activeRide.destination_lng)
+    ).then((result) => {
+      if (!cancelled && result) setRouteCoords(result.coordinates);
+    });
+    return () => { cancelled = true; };
+  }, [activeRide?.id]);
 
   useFocusEffect(
     useCallback(() => {
@@ -122,6 +139,7 @@ export default function ActiveRideScreen({ navigation }: Props) {
       <LiveMap
         style={styles.map}
         showUserLocation
+        routeCoordinates={routeCoords}
         markers={[
           {
             coordinate: { latitude: Number(activeRide.pickup_lat), longitude: Number(activeRide.pickup_lng) },
@@ -136,7 +154,7 @@ export default function ActiveRideScreen({ navigation }: Props) {
         ]}
       />
 
-      <View style={styles.panel}>
+      <View style={[styles.panel, { paddingBottom: Math.max(insets.bottom + 10, spacing.lg) }]}>
         {/* Customer info */}
         <View style={styles.customerRow}>
           <View style={styles.customerAvatar}>

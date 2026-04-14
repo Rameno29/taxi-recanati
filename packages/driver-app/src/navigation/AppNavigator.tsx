@@ -58,9 +58,9 @@ function MainTabs() {
         tabBarStyle: {
           backgroundColor: colors.white,
           borderTopColor: colors.border,
-          paddingBottom: 4,
-          paddingTop: 4,
-          height: 56,
+          paddingBottom: 8,
+          paddingTop: 6,
+          height: 64,
         },
         tabBarIcon: ({ focused, color, size }) => {
           const icons = TAB_ICONS[route.name];
@@ -72,12 +72,12 @@ function MainTabs() {
       <MainTab.Screen
         name="Dashboard"
         component={DashboardScreen}
-        options={{ title: t("tabs.dashboard"), tabBarLabel: t("tabs.dashboard") }}
+        options={{ headerShown: false, tabBarLabel: t("tabs.dashboard") }}
       />
       <MainTab.Screen
         name="ActiveRide"
         component={ActiveRideScreen}
-        options={{ title: t("tabs.ride"), tabBarLabel: t("tabs.ride") }}
+        options={{ headerShown: false, tabBarLabel: t("tabs.ride") }}
       />
       <MainTab.Screen
         name="Earnings"
