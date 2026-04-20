@@ -6,7 +6,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -20,7 +20,10 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "L'app ha bisogno della tua posizione per mostrare la tua posizione ai clienti e ricevere richieste di corsa nelle vicinanze.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "L'app ha bisogno di accedere alla tua posizione anche in background per aggiornare continuamente la tua disponibilita' e ricevere nuove richieste di corsa.",
-        "UIBackgroundModes": ["location", "remote-notification"]
+        "UIBackgroundModes": [
+          "location",
+          "remote-notification"
+        ]
       }
     },
     "android": {
@@ -43,12 +46,16 @@
     },
     "plugins": [
       "expo-secure-store",
-      ["expo-notifications", {
-        "icon": "./assets/icon.png",
-        "color": "#4357AD"
-      }],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#4357AD"
+        }
+      ],
       "expo-location",
-      "expo-task-manager"
+      "expo-task-manager",
+      "expo-localization"
     ]
   }
 }

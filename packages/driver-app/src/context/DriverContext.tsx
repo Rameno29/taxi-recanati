@@ -4,6 +4,7 @@ import { api } from "../services/api";
 import { getSocket } from "../services/socket";
 import type { Driver, Ride } from "../types";
 import { useAuth } from "./AuthContext";
+import { alertRideRequest, hapticSuccess } from "../services/feedback";
 
 interface DriverState {
   driver: Driver | null;
@@ -47,6 +48,8 @@ export function DriverProvider({ children }: { children: React.ReactNode }) {
         // Server sends ride data directly or wrapped in { ride }
         const ride = data.ride || data;
         setIncomingRequest(ride as Ride);
+        // Sound + vibration alert
+        alertRideRequest();
       };
 
       const handleStatusChange = (data: any) => {
@@ -189,6 +192,7 @@ export function DriverProvider({ children }: { children: React.ReactNode }) {
       const ride = await res.json();
       setActiveRide(ride);
       setIncomingRequest(null);
+      hapticSuccess();
     } else {
       const err = await res.json();
       throw new Error(err.message || "Failed to accept ride");

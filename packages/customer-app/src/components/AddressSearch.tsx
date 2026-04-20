@@ -11,7 +11,9 @@ import {
   Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { colors, spacing, radii, shadows } from "../theme";
+import { colors as staticColors, spacing, radii, shadows } from "../theme";
+import { useThemeColors } from "../context/ThemeContext";
+import type { SavedPlace } from "../services/savedPlaces";
 
 export interface AddressSuggestion {
   place_id: number;
@@ -41,6 +43,14 @@ interface Props {
   iconColor?: string;
   autoFocus?: boolean;
   clearOnFocus?: boolean;
+  /** Quick suggestion: show "La tua posizione" entry when query is empty. */
+  showCurrentLocation?: boolean;
+  currentLocationLabel?: string;
+  onSelectCurrentLocation?: () => void;
+  /** Quick suggestions: saved places shown when query is empty. */
+  savedPlaces?: SavedPlace[];
+  onSelectSavedPlace?: (place: SavedPlace) => void;
+  onLongPressSavedPlace?: (place: SavedPlace) => void;
 }
 
 // Nominatim geocoding — free, no API key needed
@@ -85,10 +95,17 @@ export default function AddressSearch({
   onChangeText,
   onSelect,
   icon,
-  iconColor = colors.primaryBlue,
+  iconColor = staticColors.primaryBlue,
   autoFocus = false,
   clearOnFocus = false,
+  showCurrentLocation = false,
+  currentLocationLabel = "La tua posizione",
+  onSelectCurrentLocation,
+  savedPlaces = [],
+  onSelectSavedPlace,
+  onLongPressSavedPlace,
 }: Props) {
+  const colors = useThemeColors();
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -163,14 +180,37 @@ export default function AddressSearch({
     setSuggestions([]);
   };
 
-  const showSuggestions = isFocused && suggestions.length > 0;
+  const queryEmpty = value.trim().length === 0;
+  const hasQuickSuggestions =
+    queryEmpty &&
+    ((showCurrentLocation && !!onSelectCurrentLocation) || savedPlaces.length > 0);
+  const showSuggestions = isFocused && (suggestions.length > 0 || hasQuickSuggestions);
+
+  const handleSelectCurrent = () => {
+    setSuggestions([]);
+    Keyboard.dismiss();
+    onSelectCurrentLocation?.();
+  };
+
+  const handleSelectSaved = (p: SavedPlace) => {
+    onChangeText(p.address);
+    setSuggestions([]);
+    Keyboard.dismiss();
+    onSelectSavedPlace?.(p);
+  };
 
   return (
     <View style={styles.wrapper}>
-      <View style={[styles.inputRow, isFocused && styles.inputRowFocused]}>
+      <View
+        style={[
+          styles.inputRow,
+          { backgroundColor: colors.inputBg },
+          isFocused && { borderColor: colors.primaryBlue, backgroundColor: colors.white },
+        ]}
+      >
         <Ionicons name={icon} size={20} color={iconColor} style={styles.icon} />
         <TextInput
-          style={styles.input}
+          style={[styles.input, { color: colors.dark }]}
           placeholder={placeholder}
           placeholderTextColor={colors.bodyText + "88"}
           value={value}
@@ -199,7 +239,81 @@ export default function AddressSearch({
       </View>
 
       {showSuggestions && (
-        <View style={styles.suggestionsContainer}>
+        <View style={[styles.suggestionsContainer, { backgroundColor: colors.white }]}>
+          {hasQuickSuggestions && (
+            <View>
+              {showCurrentLocation && onSelectCurrentLocation && (
+                <TouchableOpacity
+                  style={[
+                    styles.suggestionItem,
+                    styles.suggestionBorder,
+                    { borderBottomColor: colors.border },
+                  ]}
+                  onPress={handleSelectCurrent}
+                  activeOpacity={0.6}
+                >
+                  <View
+                    style={[
+                      styles.iconBubble,
+                      { backgroundColor: colors.primaryBlue + "18" },
+                    ]}
+                  >
+                    <Ionicons name="locate" size={18} color={colors.primaryBlue} />
+                  </View>
+                  <View style={styles.suggestionText}>
+                    <Text style={[styles.mainText, { color: colors.dark }]} numberOfLines={1}>
+                      {currentLocationLabel}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+
+              {savedPlaces.map((p, i) => {
+                const last = i === savedPlaces.length - 1 && suggestions.length === 0;
+                return (
+                  <TouchableOpacity
+                    key={p.id}
+                    style={[
+                      styles.suggestionItem,
+                      !last && [
+                        styles.suggestionBorder,
+                        { borderBottomColor: colors.border },
+                      ],
+                    ]}
+                    onPress={() => handleSelectSaved(p)}
+                    onLongPress={() => onLongPressSavedPlace?.(p)}
+                    delayLongPress={400}
+                    activeOpacity={0.6}
+                  >
+                    <View
+                      style={[
+                        styles.iconBubble,
+                        { backgroundColor: staticColors.accentCoral + "18" },
+                      ]}
+                    >
+                      <Ionicons
+                        name={(p.icon || "bookmark") as any}
+                        size={18}
+                        color={staticColors.accentCoral}
+                      />
+                    </View>
+                    <View style={styles.suggestionText}>
+                      <Text style={[styles.mainText, { color: colors.dark }]} numberOfLines={1}>
+                        {p.label}
+                      </Text>
+                      <Text
+                        style={[styles.secondaryText, { color: colors.bodyText }]}
+                        numberOfLines={1}
+                      >
+                        {p.address}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+
           <FlatList
             data={suggestions}
             keyExtractor={(item) => String(item.place_id)}
@@ -226,7 +340,10 @@ export default function AddressSearch({
                 <TouchableOpacity
                   style={[
                     styles.suggestionItem,
-                    index < suggestions.length - 1 && styles.suggestionBorder,
+                    index < suggestions.length - 1 && [
+                      styles.suggestionBorder,
+                      { borderBottomColor: colors.border },
+                    ],
                   ]}
                   onPress={() => handleSelect(item)}
                   activeOpacity={0.6}
@@ -238,11 +355,11 @@ export default function AddressSearch({
                     style={styles.suggestionIcon}
                   />
                   <View style={styles.suggestionText}>
-                    <Text style={styles.mainText} numberOfLines={1}>
+                    <Text style={[styles.mainText, { color: colors.dark }]} numberOfLines={1}>
                       {mainText}
                     </Text>
                     {secondary ? (
-                      <Text style={styles.secondaryText} numberOfLines={1}>
+                      <Text style={[styles.secondaryText, { color: colors.bodyText }]} numberOfLines={1}>
                         {secondary}
                       </Text>
                     ) : null}
@@ -265,16 +382,12 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.inputBg,
+    backgroundColor: staticColors.inputBg,
     borderRadius: radii.md,
     paddingHorizontal: 12,
     paddingVertical: 2,
     borderWidth: 1.5,
     borderColor: "transparent",
-  },
-  inputRowFocused: {
-    borderColor: colors.primaryBlue,
-    backgroundColor: colors.white,
   },
   icon: {
     marginRight: 8,
@@ -282,7 +395,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 15,
-    color: colors.dark,
+    color: staticColors.dark,
     paddingVertical: 12,
   },
   suggestionsContainer: {
@@ -290,7 +403,7 @@ const styles = StyleSheet.create({
     top: "100%",
     left: 0,
     right: 0,
-    backgroundColor: colors.white,
+    backgroundColor: staticColors.white,
     borderRadius: radii.md,
     marginTop: 4,
     maxHeight: 280,
@@ -307,9 +420,17 @@ const styles = StyleSheet.create({
   },
   suggestionBorder: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    borderBottomColor: staticColors.border,
   },
   suggestionIcon: {
+    marginRight: 10,
+  },
+  iconBubble: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 10,
   },
   suggestionText: {
@@ -317,12 +438,12 @@ const styles = StyleSheet.create({
   },
   mainText: {
     fontSize: 15,
-    color: colors.dark,
+    color: staticColors.dark,
     fontWeight: "500",
   },
   secondaryText: {
     fontSize: 13,
-    color: colors.bodyText,
+    color: staticColors.bodyText,
     marginTop: 2,
   },
 });

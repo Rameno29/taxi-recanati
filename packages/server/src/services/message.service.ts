@@ -1,5 +1,7 @@
 import db from "../db";
 import { AppError } from "../middleware/errorHandler";
+import { getIO } from "../socket";
+import * as notifications from "./notification.service";
 
 /**
  * Get all messages for a ride.
@@ -64,7 +66,48 @@ export async function sendMessage(
     })
     .returning("*");
 
-  return message;
+  // Get sender name for broadcast payload
+  const sender = await db("users").where("id", senderId).select("name").first();
+
+  const payload = {
+    id: message.id,
+    ride_id: message.ride_id,
+    sender_id: message.sender_id,
+    sender_name: sender?.name || "Unknown",
+    message_type: message.message_type,
+    body: message.body,
+    created_at: message.created_at,
+  };
+
+  // Broadcast to ride room via Socket.io (so other participants receive it in real time)
+  try {
+    const io = getIO();
+    io.to(`ride:${rideId}`).emit("chat:message", payload);
+    io.to("admin").emit("chat:message", payload);
+  } catch {
+    // Socket not initialized — skip broadcast (shouldn't happen in prod)
+  }
+
+  // Push notification to the other participant
+  const isCustomer = ride.customer_id === senderId;
+  let recipientId: string | null = null;
+  if (isCustomer && ride.driver_id) {
+    const driver = await db("drivers").where("id", ride.driver_id).first();
+    recipientId = driver?.user_id || null;
+  } else if (!isCustomer) {
+    recipientId = ride.customer_id;
+  }
+
+  if (recipientId) {
+    notifications
+      .sendToUser(recipientId, sender?.name || "Messaggio", message.body, {
+        type: "chat_message",
+        rideId,
+      })
+      .catch(() => {});
+  }
+
+  return payload;
 }
 
 /**

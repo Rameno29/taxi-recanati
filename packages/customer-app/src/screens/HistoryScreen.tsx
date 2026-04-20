@@ -10,11 +10,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useFocusEffect } from "@react-navigation/native";
 import { api } from "../services/api";
-import { colors, spacing, radii, shadows } from "../theme";
+import { colors as staticColors, spacing, radii, shadows } from "../theme";
+import { useThemeColors } from "../context/ThemeContext";
 import type { Ride } from "../types";
 
 export default function HistoryScreen() {
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const [rides, setRides] = useState<Ride[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -48,9 +50,9 @@ export default function HistoryScreen() {
     const fare = item.fare_final || item.fare_estimate;
 
     return (
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: colors.white }]}>
         <View style={styles.cardHeader}>
-          <Text style={styles.date}>
+          <Text style={[styles.date, { color: colors.bodyText }]}>
             {date.toLocaleDateString()} {date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
           </Text>
           <View style={[styles.statusBadge, { backgroundColor: item.status === "completed" ? colors.success : colors.error }]}>
@@ -60,19 +62,19 @@ export default function HistoryScreen() {
 
         <View style={styles.addressRow}>
           <Ionicons name="location" size={16} color={colors.primaryBlue} />
-          <Text style={styles.address} numberOfLines={1}>
+          <Text style={[styles.address, { color: colors.dark }]} numberOfLines={1}>
             {item.pickup_address || `${Number(item.pickup_lat).toFixed(4)}, ${Number(item.pickup_lng).toFixed(4)}`}
           </Text>
         </View>
         <View style={styles.addressRow}>
           <Ionicons name="flag" size={16} color={colors.accentCoral} />
-          <Text style={styles.address} numberOfLines={1}>
+          <Text style={[styles.address, { color: colors.dark }]} numberOfLines={1}>
             {item.destination_address || `${Number(item.destination_lat).toFixed(4)}, ${Number(item.destination_lng).toFixed(4)}`}
           </Text>
         </View>
 
-        <View style={styles.cardFooter}>
-          <Text style={styles.fare}>€{Number(fare).toFixed(2)}</Text>
+        <View style={[styles.cardFooter, { borderTopColor: colors.border }]}>
+          <Text style={[styles.fare, { color: colors.dark }]}>€{Number(fare).toFixed(2)}</Text>
 
           {item.customer_rating && (
             <View style={styles.ratingRow}>
@@ -92,37 +94,39 @@ export default function HistoryScreen() {
   };
 
   return (
-    <FlatList
-      data={rides}
-      keyExtractor={(item) => item.id}
-      renderItem={renderRide}
-      contentContainerStyle={styles.list}
-      style={{ backgroundColor: colors.lightBg }}
-      refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={() => fetchHistory(1)} tintColor={colors.primaryBlue} />
-      }
-      onEndReached={() => {
-        if (page < totalPages && !loading) fetchHistory(page + 1);
-      }}
-      onEndReachedThreshold={0.5}
-      ListEmptyComponent={
-        !loading ? (
-          <View style={styles.empty}>
-            <Ionicons name="receipt-outline" size={56} color={colors.border} />
-            <Text style={styles.emptyText}>{t("history.empty")}</Text>
-          </View>
-        ) : null
-      }
-    />
+    <View style={{ flex: 1, backgroundColor: colors.lightBg }}>
+      <FlatList
+        data={rides}
+        keyExtractor={(item) => item.id}
+        renderItem={renderRide}
+        contentContainerStyle={styles.list}
+        style={{ backgroundColor: colors.lightBg }}
+        refreshControl={
+          <RefreshControl refreshing={loading} onRefresh={() => fetchHistory(1)} tintColor={colors.primaryBlue} />
+        }
+        onEndReached={() => {
+          if (page < totalPages && !loading) fetchHistory(page + 1);
+        }}
+        onEndReachedThreshold={0.5}
+        ListEmptyComponent={
+          !loading ? (
+            <View style={styles.empty}>
+              <Ionicons name="receipt-outline" size={56} color={colors.border} />
+              <Text style={[styles.emptyText, { color: colors.bodyText }]}>{t("history.empty")}</Text>
+            </View>
+          ) : null
+        }
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   list: { padding: spacing.md, flexGrow: 1 },
   empty: { flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 60, gap: spacing.md },
-  emptyText: { fontSize: 16, color: colors.bodyText },
+  emptyText: { fontSize: 16, color: staticColors.bodyText },
   card: {
-    backgroundColor: colors.white,
+    backgroundColor: staticColors.white,
     borderRadius: radii.lg,
     padding: spacing.md,
     marginBottom: spacing.md,
@@ -134,20 +138,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: spacing.sm,
   },
-  date: { fontSize: 14, color: colors.bodyText },
+  date: { fontSize: 14, color: staticColors.bodyText },
   statusBadge: {
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: radii.full,
   },
-  statusText: { color: colors.white, fontSize: 12, fontWeight: "bold" },
+  statusText: { color: staticColors.white, fontSize: 12, fontWeight: "bold" },
   addressRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
     marginBottom: 4,
   },
-  address: { flex: 1, fontSize: 14, color: colors.dark },
+  address: { flex: 1, fontSize: 14, color: staticColors.dark },
   cardFooter: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -155,8 +159,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     paddingTop: spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: staticColors.border,
   },
-  fare: { fontSize: 18, fontWeight: "bold", color: colors.dark },
+  fare: { fontSize: 18, fontWeight: "bold", color: staticColors.dark },
   ratingRow: { flexDirection: "row", gap: 2 },
 });

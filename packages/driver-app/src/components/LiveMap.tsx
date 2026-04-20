@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from "react";
 import { StyleSheet, ViewStyle } from "react-native";
 import MapView, { Marker, Polyline, Region } from "react-native-maps";
 import { colors } from "../theme";
+import { useTheme } from "../context/ThemeContext";
 
 interface MarkerData {
   coordinate: { latitude: number; longitude: number };
@@ -36,6 +37,9 @@ export default function LiveMap({
   style,
 }: LiveMapProps) {
   const mapRef = useRef<MapView>(null);
+  const { isDark } = useTheme();
+  const routeColor = isDark ? "#40C4FF" : colors.primaryBlue;
+  const driverPinColor = isDark ? "#40C4FF" : colors.primaryBlue;
 
   // Fit map to show route, markers, and driver
   useEffect(() => {
@@ -75,8 +79,8 @@ export default function LiveMap({
       {routeCoordinates && routeCoordinates.length >= 2 && (
         <Polyline
           coordinates={routeCoordinates}
-          strokeColor={colors.primaryBlue}
-          strokeWidth={4}
+          strokeColor={routeColor}
+          strokeWidth={5}
         />
       )}
 
@@ -92,7 +96,7 @@ export default function LiveMap({
         <Marker
           coordinate={driverLocation}
           title="Driver"
-          pinColor={colors.primaryBlue}
+          pinColor={driverPinColor}
         />
       )}
     </MapView>

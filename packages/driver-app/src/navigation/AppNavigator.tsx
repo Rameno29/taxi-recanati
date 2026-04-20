@@ -1,11 +1,12 @@
 import React from "react";
 import { ActivityIndicator, View } from "react-native";
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, DefaultTheme, DarkTheme } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import { colors } from "../theme";
 
 import LoginScreen from "../screens/LoginScreen";
@@ -46,21 +47,22 @@ const TAB_ICONS: Record<string, { focused: keyof typeof Ionicons.glyphMap; unfoc
 
 function MainTabs() {
   const { t } = useTranslation();
+  const { colors: c } = useTheme();
 
   return (
     <MainTab.Navigator
       screenOptions={({ route }) => ({
-        headerStyle: { backgroundColor: colors.primaryBlue },
-        headerTintColor: colors.white,
+        headerStyle: { backgroundColor: c.primaryBlue },
+        headerTintColor: "#FFF",
         headerTitleStyle: { fontWeight: "bold" },
-        tabBarActiveTintColor: colors.primaryBlue,
-        tabBarInactiveTintColor: colors.bodyText,
+        tabBarActiveTintColor: c.primaryBlue,
+        tabBarInactiveTintColor: c.bodyText,
         tabBarStyle: {
-          backgroundColor: colors.white,
-          borderTopColor: colors.border,
-          paddingBottom: 8,
-          paddingTop: 6,
-          height: 64,
+          backgroundColor: c.white,
+          borderTopColor: c.border,
+          paddingBottom: 30,
+          paddingTop: 10,
+          height: 92,
         },
         tabBarIcon: ({ focused, color, size }) => {
           const icons = TAB_ICONS[route.name];
@@ -124,8 +126,18 @@ function MainNavigator() {
   );
 }
 
+const CustomDarkTheme = {
+  ...DarkTheme,
+  colors: { ...DarkTheme.colors, primary: colors.primaryBlue, card: "#1E1E1E", background: "#121212" },
+};
+const CustomLightTheme = {
+  ...DefaultTheme,
+  colors: { ...DefaultTheme.colors, primary: colors.primaryBlue, card: colors.white, background: colors.lightBg },
+};
+
 export default function AppNavigator() {
   const { user, loading } = useAuth();
+  const { isDark } = useTheme();
 
   if (loading) {
     return (
@@ -136,7 +148,7 @@ export default function AppNavigator() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={isDark ? CustomDarkTheme : CustomLightTheme}>
       {user ? <MainNavigator /> : <AuthNavigator />}
     </NavigationContainer>
   );

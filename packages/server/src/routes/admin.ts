@@ -20,6 +20,22 @@ const updateDriverSchema = z.object({
   license_plate: z.string().min(1).max(20).optional(),
 }).strict(); // reject unknown fields — prevents mass assignment
 
+const createDriverSchema = z.object({
+  name: z.string().min(2).max(100),
+  phone: z.string().regex(/^\+[1-9]\d{6,14}$/, "Phone must be in E.164 format (e.g. +393271234567)"),
+  email: z.string().email(),
+  license_plate: z.string().min(2).max(20),
+  vehicle_type: z.enum(["standard", "monovolume", "premium", "van"]),
+  vehicle_model: z.string().max(80).optional().nullable(),
+}).strict();
+
+const updateDriverDetailsSchema = z.object({
+  name: z.string().min(2).max(100).optional(),
+  phone: z.string().regex(/^\+[1-9]\d{6,14}$/).optional(),
+  email: z.string().email().optional(),
+  vehicle_model: z.string().max(80).nullable().optional(),
+}).strict();
+
 const refundSchema = z.object({
   amount: z.number().positive().max(10000), // max 10k refund
 });
@@ -58,10 +74,12 @@ router.get("/drivers", async (req: Request, res: Response, next: NextFunction) =
   }
 });
 
-/** GET /api/admin/drivers/positions — live driver map positions */
-router.get("/drivers/positions", async (_req: Request, res: Response, next: NextFunction) => {
+/** GET /api/admin/drivers/positions — live driver map positions
+ *  ?include_offline=true also returns offline drivers' last-known positions */
+router.get("/drivers/positions", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const positions = await adminService.getDriverPositions();
+    const includeOffline = req.query.include_offline === "true" || req.query.include_offline === "1";
+    const positions = await adminService.getDriverPositions(includeOffline);
     res.json(positions);
   } catch (err) {
     next(err);
@@ -84,6 +102,55 @@ router.patch("/drivers/:id", async (req: Request, res: Response, next: NextFunct
         statusCode: 400,
       });
     }
+    next(err);
+  }
+});
+
+/** POST /api/admin/drivers — create a new driver with auto-generated password */
+router.post("/drivers", sensitiveLimiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = createDriverSchema.parse(req.body);
+    const result = await adminService.createDriver(data);
+    res.status(201).json(result);
+  } catch (err) {
+    if (err instanceof AppError) return next(err);
+    if ((err as any).name === "ZodError") {
+      return res.status(400).json({
+        error: "ValidationError",
+        message: (err as any).errors[0].message,
+        statusCode: 400,
+      });
+    }
+    next(err);
+  }
+});
+
+/** PATCH /api/admin/drivers/:id/details — update name/phone/email/vehicle_model */
+router.patch("/drivers/:id/details", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = updateDriverDetailsSchema.parse(req.body);
+    const driver = await adminService.updateDriverDetails(req.params.id as string, data);
+    res.json(driver);
+  } catch (err) {
+    if (err instanceof AppError) return next(err);
+    if ((err as any).name === "ZodError") {
+      return res.status(400).json({
+        error: "ValidationError",
+        message: (err as any).errors[0].message,
+        statusCode: 400,
+      });
+    }
+    next(err);
+  }
+});
+
+/** POST /api/admin/drivers/:id/reset-password — regenerate driver password (returns plaintext ONCE) */
+router.post("/drivers/:id/reset-password", sensitiveLimiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await adminService.resetDriverPassword(req.params.id as string);
+    res.json(result);
+  } catch (err) {
+    if (err instanceof AppError) return next(err);
     next(err);
   }
 });

@@ -4,9 +4,13 @@ import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import { api } from "./api";
 
+// Show notifications in foreground too. Expo SDK 51+ replaced shouldShowAlert
+// with shouldShowBanner + shouldShowList — include all for compatibility.
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
   } as any),

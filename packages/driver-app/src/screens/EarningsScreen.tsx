@@ -10,7 +10,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useFocusEffect } from "@react-navigation/native";
 import { api } from "../services/api";
-import { colors, spacing, radii, fonts } from "../theme";
+import { colors as staticColors, spacing, radii, fonts } from "../theme";
+import { useThemeColors } from "../context/ThemeContext";
 import type { EarningsSummary } from "../types";
 
 type EarningPeriod = {
@@ -27,26 +28,27 @@ const PERIODS: EarningPeriod[] = [
     amountKey: "today",
     ridesKey: "total_rides_today",
     icon: "today-outline",
-    accentColor: colors.accentCoral,
+    accentColor: staticColors.accentCoral,
   },
   {
     labelKey: "earnings.week",
     amountKey: "week",
     ridesKey: "total_rides_week",
     icon: "calendar-outline",
-    accentColor: colors.primaryBlue,
+    accentColor: staticColors.primaryBlue,
   },
   {
     labelKey: "earnings.month",
     amountKey: "month",
     ridesKey: "total_rides_month",
     icon: "calendar",
-    accentColor: colors.driverGreen,
+    accentColor: staticColors.driverGreen,
   },
 ];
 
 export default function EarningsScreen() {
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const [earnings, setEarnings] = useState<EarningsSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -75,30 +77,30 @@ export default function EarningsScreen() {
     return (
       <View style={styles.center}>
         <Ionicons name="wallet-outline" size={64} color={colors.border} />
-        <Text style={styles.emptyText}>{t("earnings.noData")}</Text>
+        <Text style={[styles.emptyText, { color: colors.bodyText }]}>{t("earnings.noData")}</Text>
       </View>
     );
   }
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.lightBg }]}
       contentContainerStyle={styles.content}
       refreshControl={
         <RefreshControl refreshing={loading} onRefresh={fetchEarnings} />
       }
     >
       {PERIODS.map((period) => (
-        <View key={period.labelKey} style={styles.card}>
+        <View key={period.labelKey} style={[styles.card, { backgroundColor: colors.white }]}>
           <View style={[styles.cardIconContainer, { backgroundColor: period.accentColor + "15" }]}>
             <Ionicons name={period.icon as any} size={28} color={period.accentColor} />
           </View>
           <View style={styles.cardContent}>
-            <Text style={styles.cardLabel}>{t(period.labelKey as any)}</Text>
-            <Text style={styles.cardAmount}>
+            <Text style={[styles.cardLabel, { color: colors.bodyText }]}>{t(period.labelKey as any)}</Text>
+            <Text style={[styles.cardAmount, { color: colors.dark }]}>
               €{earnings ? Number(earnings[period.amountKey]).toFixed(2) : "0.00"}
             </Text>
-            <Text style={styles.cardRides}>
+            <Text style={[styles.cardRides, { color: colors.bodyText }]}>
               {(earnings?.[period.ridesKey] as number) || 0} {t("earnings.rides")}
             </Text>
           </View>
@@ -109,14 +111,14 @@ export default function EarningsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.lightBg },
+  container: { flex: 1, backgroundColor: staticColors.lightBg },
   content: { padding: spacing.md },
   center: { flex: 1, justifyContent: "center", alignItems: "center", gap: spacing.md },
-  emptyText: { fontSize: fonts.body, color: colors.bodyText },
+  emptyText: { fontSize: fonts.body, color: staticColors.bodyText },
   card: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.white,
+    backgroundColor: staticColors.white,
     borderRadius: radii.lg,
     padding: spacing.lg,
     marginBottom: spacing.md,
@@ -135,7 +137,7 @@ const styles = StyleSheet.create({
     marginRight: spacing.md,
   },
   cardContent: { flex: 1 },
-  cardLabel: { fontSize: fonts.label, color: colors.bodyText, marginBottom: spacing.xs },
-  cardAmount: { fontSize: 32, fontWeight: "bold", color: colors.dark },
-  cardRides: { fontSize: fonts.caption, color: colors.bodyText, marginTop: 2 },
+  cardLabel: { fontSize: fonts.label, color: staticColors.bodyText, marginBottom: spacing.xs },
+  cardAmount: { fontSize: 32, fontWeight: "bold", color: staticColors.dark },
+  cardRides: { fontSize: fonts.caption, color: staticColors.bodyText, marginTop: 2 },
 });

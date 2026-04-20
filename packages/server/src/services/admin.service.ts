@@ -1,6 +1,10 @@
+import bcrypt from "bcrypt";
 import db from "../db";
 import { AppError } from "../middleware/errorHandler";
 import { broadcastDriverStatus } from "../handlers/ride.handler";
+import { generateTempPassword } from "../utils/password";
+
+const BCRYPT_ROUNDS = 10;
 
 /**
  * List all drivers with their user info.
@@ -21,6 +25,147 @@ export async function listDrivers(status?: string) {
   }
 
   return query;
+}
+
+/**
+ * Admin: create a new driver (user + driver profile) with an auto-generated
+ * temporary password. The plaintext password is returned ONCE — the admin
+ * must copy it, it can never be retrieved afterwards (stored as bcrypt hash).
+ */
+export async function createDriver(input: {
+  name: string;
+  phone: string;
+  email: string;
+  license_plate: string;
+  vehicle_type: "standard" | "monovolume" | "premium" | "van";
+  vehicle_model?: string | null;
+}) {
+  // Enforce company email domain
+  if (!input.email.toLowerCase().endsWith("@taxirecanati.it")) {
+    throw new AppError(400, "Email must end with @taxirecanati.it");
+  }
+
+  // Uniqueness checks (before opening the transaction — cheaper failure path)
+  const [phoneExists, emailExists] = await Promise.all([
+    db("users").where("phone", input.phone).first(),
+    db("users").where("email", input.email).first(),
+  ]);
+  if (phoneExists) throw new AppError(409, "A user with this phone already exists");
+  if (emailExists) throw new AppError(409, "A user with this email already exists");
+
+  const tempPassword = generateTempPassword(12);
+  const passwordHash = await bcrypt.hash(tempPassword, BCRYPT_ROUNDS);
+
+  const { user, driver } = await db.transaction(async (trx) => {
+    const [user] = await trx("users")
+      .insert({
+        name: input.name,
+        phone: input.phone,
+        email: input.email,
+        password_hash: passwordHash,
+        role: "driver",
+        language: "it",
+      })
+      .returning("*");
+
+    const [driver] = await trx("drivers")
+      .insert({
+        user_id: user.id,
+        license_plate: input.license_plate,
+        vehicle_type: input.vehicle_type,
+        vehicle_model: input.vehicle_model || null,
+        status: "offline",
+      })
+      .returning("*");
+
+    return { user, driver };
+  });
+
+  return {
+    driver: {
+      ...driver,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+    },
+    tempPassword,
+  };
+}
+
+/**
+ * Admin: reset a driver's password. Generates a new random password,
+ * stores its hash, and returns the plaintext ONCE.
+ */
+export async function resetDriverPassword(driverId: string) {
+  const driver = await db("drivers").where("id", driverId).first();
+  if (!driver) throw new AppError(404, "Driver not found");
+
+  const tempPassword = generateTempPassword(12);
+  const passwordHash = await bcrypt.hash(tempPassword, BCRYPT_ROUNDS);
+
+  await db("users")
+    .where("id", driver.user_id)
+    .update({ password_hash: passwordHash });
+
+  return { tempPassword };
+}
+
+/**
+ * Admin: update a driver's user-level fields (name, phone) and/or
+ * vehicle_model. Kept separate from adminUpdateDriver to avoid bloating
+ * the mass-assignment-safe payload on PATCH /drivers/:id.
+ */
+export async function updateDriverDetails(
+  driverId: string,
+  updates: { name?: string; phone?: string; email?: string; vehicle_model?: string | null }
+) {
+  const driver = await db("drivers").where("id", driverId).first();
+  if (!driver) throw new AppError(404, "Driver not found");
+
+  // Enforce email domain if being changed
+  if (updates.email && !updates.email.toLowerCase().endsWith("@taxirecanati.it")) {
+    throw new AppError(400, "Email must end with @taxirecanati.it");
+  }
+
+  // Uniqueness: phone and email must remain unique (excluding this user)
+  if (updates.phone) {
+    const conflict = await db("users")
+      .where("phone", updates.phone)
+      .whereNot("id", driver.user_id)
+      .first();
+    if (conflict) throw new AppError(409, "Phone already in use");
+  }
+  if (updates.email) {
+    const conflict = await db("users")
+      .where("email", updates.email)
+      .whereNot("id", driver.user_id)
+      .first();
+    if (conflict) throw new AppError(409, "Email already in use");
+  }
+
+  await db.transaction(async (trx) => {
+    const userPayload: Record<string, any> = {};
+    if (updates.name !== undefined) userPayload.name = updates.name;
+    if (updates.phone !== undefined) userPayload.phone = updates.phone;
+    if (updates.email !== undefined) userPayload.email = updates.email;
+    if (Object.keys(userPayload).length > 0) {
+      await trx("users").where("id", driver.user_id).update(userPayload);
+    }
+
+    if (updates.vehicle_model !== undefined) {
+      await trx("drivers").where("id", driverId).update({
+        vehicle_model: updates.vehicle_model,
+      });
+    }
+  });
+
+  const updated = await db("drivers as d")
+    .join("users as u", "d.user_id", "u.id")
+    .where("d.id", driverId)
+    .select("d.*", "u.name", "u.email", "u.phone")
+    .first();
+
+  return updated;
 }
 
 /**
@@ -156,7 +301,7 @@ export async function getRevenueAnalytics(period: "week" | "month" | "year" = "m
   // Daily revenue for the period
   const dailyRevenue = await db("rides")
     .where("status", "completed")
-    .whereRaw("completed_at >= NOW() - INTERVAL ?", [interval])
+    .whereRaw("completed_at >= NOW() - ?::interval", [interval])
     .select(
       db.raw("DATE(completed_at) as date"),
       db.raw("COUNT(*) as rides"),
@@ -169,7 +314,7 @@ export async function getRevenueAnalytics(period: "week" | "month" | "year" = "m
   // Totals for the period
   const [totals] = await db("rides")
     .where("status", "completed")
-    .whereRaw("completed_at >= NOW() - INTERVAL ?", [interval])
+    .whereRaw("completed_at >= NOW() - ?::interval", [interval])
     .select(
       db.raw("COUNT(*) as total_rides"),
       db.raw("COALESCE(SUM(fare_final), 0) as total_revenue"),
@@ -180,21 +325,21 @@ export async function getRevenueAnalytics(period: "week" | "month" | "year" = "m
 
   // Rides by status for the period
   const byStatus = await db("rides")
-    .whereRaw("created_at >= NOW() - INTERVAL ?", [interval])
+    .whereRaw("created_at >= NOW() - ?::interval", [interval])
     .select("status", db.raw("COUNT(*) as count"))
     .groupBy("status");
 
   // Rides by vehicle type
   const byVehicle = await db("rides")
     .where("status", "completed")
-    .whereRaw("completed_at >= NOW() - INTERVAL ?", [interval])
+    .whereRaw("completed_at >= NOW() - ?::interval", [interval])
     .select("vehicle_type", db.raw("COUNT(*) as count"), db.raw("COALESCE(SUM(fare_final), 0) as revenue"))
     .groupBy("vehicle_type");
 
   // Peak hours
   const peakHours = await db("rides")
     .where("status", "completed")
-    .whereRaw("completed_at >= NOW() - INTERVAL ?", [interval])
+    .whereRaw("completed_at >= NOW() - ?::interval", [interval])
     .select(
       db.raw("EXTRACT(HOUR FROM created_at)::int as hour"),
       db.raw("COUNT(*) as rides")
@@ -249,7 +394,7 @@ export async function getDriverPerformance(period: "week" | "month" | "year" = "
     .join("drivers as d", "r.driver_id", "d.id")
     .join("users as u", "d.user_id", "u.id")
     .where("r.status", "completed")
-    .whereRaw("r.completed_at >= NOW() - INTERVAL ?", [interval])
+    .whereRaw("r.completed_at >= NOW() - ?::interval", [interval])
     .select(
       "d.id as driver_id",
       "u.name",
@@ -324,13 +469,22 @@ export async function getAuditLog(filters: {
 }
 
 /**
- * Get all active driver positions for the admin map.
+ * Get driver positions for the admin map.
+ * By default returns only currently-active drivers (available/busy).
+ * With `includeOffline=true`, also returns offline/suspended drivers that
+ * have a last-known position, so admins can see where their fleet was last
+ * seen.
  */
-export async function getDriverPositions() {
+export async function getDriverPositions(includeOffline: boolean = false) {
+  const statuses = includeOffline
+    ? ["available", "busy", "offline", "suspended", "paused"]
+    : ["available", "busy"];
+
   return db("drivers as d")
     .join("users as u", "d.user_id", "u.id")
-    .whereIn("d.status", ["available", "busy"])
+    .whereIn("d.status", statuses)
     .whereNotNull("d.current_lat")
+    .whereNotNull("d.current_lng")
     .select(
       "d.id",
       "d.status",
@@ -338,6 +492,7 @@ export async function getDriverPositions() {
       "d.current_lng",
       "d.vehicle_type",
       "d.license_plate",
+      "d.last_location_at",
       "u.name",
       "u.phone"
     );

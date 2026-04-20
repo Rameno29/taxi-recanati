@@ -15,6 +15,7 @@ interface DriverPosition {
   current_lng: number;
   vehicle_type: string;
   license_plate: string;
+  last_location_at?: string | null;
 }
 
 const greenIcon = new L.Icon({
@@ -33,20 +34,52 @@ const redIcon = new L.Icon({
   popupAnchor: [1, -34],
 });
 
+const greyIcon = new L.Icon({
+  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-grey.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  className: "offline-driver-marker",
+});
+
+function formatLastSeen(iso?: string | null): string {
+  if (!iso) return "sconosciuto";
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(diffMs / 60000);
+  if (min < 1) return "pochi secondi fa";
+  if (min < 60) return `${min} min fa`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h}h fa`;
+  const d = Math.floor(h / 24);
+  return `${d}g fa`;
+}
+
 const CENTER: [number, number] = [43.4034, 13.5498];
 
 export default function MapPage() {
   const [drivers, setDrivers] = useState<DriverPosition[]>([]);
+  const [includeOffline, setIncludeOffline] = useState<boolean>(() => {
+    return localStorage.getItem("map:includeOffline") === "1";
+  });
   const driversRef = useRef<DriverPosition[]>([]);
+  const includeOfflineRef = useRef(includeOffline);
+  includeOfflineRef.current = includeOffline;
 
   const fetchPositions = async () => {
-    const res = await api.get("/api/admin/drivers/positions");
+    const qs = includeOfflineRef.current ? "?include_offline=true" : "";
+    const res = await api.get(`/api/admin/drivers/positions${qs}`);
     if (res.ok) {
       const data = await res.json();
       setDrivers(data);
       driversRef.current = data;
     }
   };
+
+  useEffect(() => {
+    localStorage.setItem("map:includeOffline", includeOffline ? "1" : "0");
+    fetchPositions();
+  }, [includeOffline]);
 
   useEffect(() => {
     fetchPositions();
@@ -83,7 +116,14 @@ export default function MapPage() {
   }, []);
 
   const available = drivers.filter((d) => d.status === "available").length;
-  const busy = drivers.filter((d) => d.status !== "available").length;
+  const busy = drivers.filter((d) => d.status === "busy").length;
+  const offline = drivers.filter((d) => d.status !== "available" && d.status !== "busy").length;
+
+  const iconFor = (status: string) => {
+    if (status === "available") return greenIcon;
+    if (status === "busy") return redIcon;
+    return greyIcon;
+  };
 
   return (
     <div>
@@ -98,6 +138,21 @@ export default function MapPage() {
             <span style={{ ...styles.legendDot, background: "#F44336" }} />
             Occupati ({busy})
           </span>
+          {includeOffline && (
+            <span style={styles.legendItem}>
+              <span style={{ ...styles.legendDot, background: "#9E9E9E" }} />
+              Offline ({offline})
+            </span>
+          )}
+          <label style={styles.toggle}>
+            <input
+              type="checkbox"
+              checked={includeOffline}
+              onChange={(e) => setIncludeOffline(e.target.checked)}
+              style={{ marginRight: 6 }}
+            />
+            Mostra offline (ultima posizione)
+          </label>
           <span style={styles.liveIndicator}>
             <span style={styles.liveDot} />
             LIVE
@@ -110,25 +165,37 @@ export default function MapPage() {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          {drivers.map((d) => (
-            <Marker
-              key={d.id}
-              position={[d.current_lat, d.current_lng]}
-              icon={d.status === "available" ? greenIcon : redIcon}
-            >
-              <Popup>
-                <strong>{d.name}</strong>
-                <br />
-                {d.license_plate} — {d.vehicle_type}
-                <br />
-                <span style={{ color: d.status === "available" ? "#4CAF50" : "#F44336", fontWeight: 600 }}>
-                  {d.status}
-                </span>
-                <br />
-                {d.phone}
-              </Popup>
-            </Marker>
-          ))}
+          {drivers.map((d) => {
+            const isActive = d.status === "available" || d.status === "busy";
+            const statusColor =
+              d.status === "available" ? "#4CAF50" : d.status === "busy" ? "#F44336" : "#9E9E9E";
+            return (
+              <Marker
+                key={d.id}
+                position={[d.current_lat, d.current_lng]}
+                icon={iconFor(d.status)}
+                opacity={isActive ? 1 : 0.6}
+              >
+                <Popup>
+                  <strong>{d.name}</strong>
+                  <br />
+                  {d.license_plate} — {d.vehicle_type}
+                  <br />
+                  <span style={{ color: statusColor, fontWeight: 600 }}>{d.status}</span>
+                  <br />
+                  {d.phone}
+                  {!isActive && (
+                    <>
+                      <br />
+                      <span style={{ color: "#757575", fontSize: 11 }}>
+                        Ultima posizione: {formatLastSeen(d.last_location_at)}
+                      </span>
+                    </>
+                  )}
+                </Popup>
+              </Marker>
+            );
+          })}
         </MapContainer>
       </div>
     </div>
@@ -141,6 +208,15 @@ const styles: Record<string, React.CSSProperties> = {
   legend: { display: "flex", gap: 20, alignItems: "center" },
   legendItem: { display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#555", fontWeight: 500 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
+  toggle: {
+    display: "flex",
+    alignItems: "center",
+    fontSize: 13,
+    color: "#555",
+    fontWeight: 500,
+    cursor: "pointer",
+    userSelect: "none" as const,
+  },
   liveIndicator: {
     display: "flex",
     alignItems: "center",

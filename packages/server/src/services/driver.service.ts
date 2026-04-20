@@ -107,6 +107,27 @@ export async function pushLocation(
 }
 
 /**
+ * Public (any authenticated user): active driver positions for the customer
+ * map. Returns ONLY `available` drivers with a known location. No PII — no
+ * name, phone, plate, driver_id. Coordinates are slightly blurred at read
+ * time so customers can see availability density without being able to
+ * track individual drivers.
+ */
+export async function getActivePositionsPublic() {
+  const rows = await db("drivers")
+    .where("status", "available")
+    .whereNotNull("current_lat")
+    .whereNotNull("current_lng")
+    .select("current_lat", "current_lng", "vehicle_type");
+
+  return rows.map((r: any) => ({
+    lat: Number(r.current_lat),
+    lng: Number(r.current_lng),
+    vehicle_type: r.vehicle_type,
+  }));
+}
+
+/**
  * Get driver earnings within a date range.
  */
 export async function getEarnings(

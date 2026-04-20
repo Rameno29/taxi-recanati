@@ -46,6 +46,7 @@ export default function AnalyticsPage() {
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [drivers, setDrivers] = useState<DriverPerf[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -53,13 +54,28 @@ export default function AnalyticsPage() {
 
   const fetchData = async () => {
     setLoading(true);
-    const [revRes, drvRes] = await Promise.all([
-      api.get(`/api/admin/analytics/revenue?period=${period}`),
-      api.get(`/api/admin/analytics/drivers?period=${period}`),
-    ]);
-    if (revRes.ok) setAnalytics(await revRes.json());
-    if (drvRes.ok) setDrivers(await drvRes.json());
-    setLoading(false);
+    setError(null);
+    try {
+      const [revRes, drvRes] = await Promise.all([
+        api.get(`/api/admin/analytics/revenue?period=${period}`),
+        api.get(`/api/admin/analytics/drivers?period=${period}`),
+      ]);
+      if (!revRes.ok) {
+        const body = await revRes.json().catch(() => ({}));
+        throw new Error(body.message || `Revenue API ${revRes.status}`);
+      }
+      if (!drvRes.ok) {
+        const body = await drvRes.json().catch(() => ({}));
+        throw new Error(body.message || `Drivers API ${drvRes.status}`);
+      }
+      setAnalytics(await revRes.json());
+      setDrivers(await drvRes.json());
+    } catch (e: any) {
+      console.error("Analytics fetch failed:", e);
+      setError(e.message || "Errore sconosciuto");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const periodLabels: Record<Period, string> = {
@@ -68,10 +84,32 @@ export default function AnalyticsPage() {
     year: "Ultimo anno",
   };
 
-  if (loading || !analytics)
+  if (loading)
     return (
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "50vh", color: "#999" }}>
         Caricamento...
+      </div>
+    );
+
+  if (error || !analytics)
+    return (
+      <div style={{ padding: 40, textAlign: "center" }}>
+        <h3 style={{ color: "#F44336", marginBottom: 12 }}>Impossibile caricare le analytics</h3>
+        <p style={{ color: "#666", marginBottom: 20 }}>{error || "Nessun dato disponibile"}</p>
+        <button
+          onClick={fetchData}
+          style={{
+            padding: "10px 24px",
+            background: "#4357AD",
+            color: "#fff",
+            border: "none",
+            borderRadius: 8,
+            cursor: "pointer",
+            fontWeight: 600,
+          }}
+        >
+          Riprova
+        </button>
       </div>
     );
 

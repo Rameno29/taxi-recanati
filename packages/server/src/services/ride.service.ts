@@ -254,7 +254,8 @@ export async function getRideById(rideId: string) {
       "driver_user.name as driver_name",
       "driver_user.phone as driver_phone",
       "d.license_plate",
-      "d.vehicle_type as driver_vehicle_type"
+      "d.vehicle_type as driver_vehicle_type",
+      "d.user_id as driver_user_id"
     )
     .first();
 

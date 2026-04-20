@@ -4,10 +4,13 @@ import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import { api } from "./api";
 
-// Configure how notifications are presented when app is in foreground
+// Configure how notifications are presented when app is in foreground.
+// Expo SDK 51+ replaced shouldShowAlert with shouldShowBanner + shouldShowList.
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
   } as any),

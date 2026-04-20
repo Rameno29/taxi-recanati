@@ -9,6 +9,17 @@ const router = Router();
 
 router.use(authenticate);
 
+/** GET /api/drivers/active-positions — public (any authenticated user):
+ *  nearby available drivers for the customer map. No PII. */
+router.get("/active-positions", async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const positions = await driverService.getActivePositionsPublic();
+    res.json(positions);
+  } catch (err) {
+    next(err);
+  }
+});
+
 /** POST /api/drivers/profile — create driver profile */
 router.post("/profile", requireRole("driver", "admin"), async (req: Request, res: Response, next: NextFunction) => {
   try {
