@@ -10,10 +10,15 @@ interface DriverState {
   driver: Driver | null;
   isOnline: boolean;
   activeRide: Ride | null;
+  /** First-come-first-served queue of rides currently up for grabs. */
+  availableRides: Ride[];
+  /** Convenience: same as `availableRides[0]` — legacy single-request UI. */
   incomingRequest: Ride | null;
   toggleOnline: () => Promise<void>;
   acceptRide: (rideId: string) => Promise<void>;
-  declineRide: () => void;
+  declineRide: (rideId?: string) => void;
+  /** Force-refresh the available ride list from the server. */
+  refreshAvailableRides: () => Promise<void>;
   updateRideStatus: (status: string, reason?: string) => Promise<void>;
   refreshActiveRide: () => Promise<void>;
 }
@@ -27,8 +32,12 @@ export function DriverProvider({ children }: { children: React.ReactNode }) {
   const [driver, setDriver] = useState<Driver | null>(null);
   const [isOnline, setIsOnline] = useState(false);
   const [activeRide, setActiveRide] = useState<Ride | null>(null);
-  const [incomingRequest, setIncomingRequest] = useState<Ride | null>(null);
+  const [availableRides, setAvailableRides] = useState<Ride[]>([]);
   const gpsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // UI convenience: treat the oldest queued ride as the "primary" incoming
+  // request so the existing single-card UI keeps working.
+  const incomingRequest = availableRides[0] || null;
 
   // Fetch driver profile on mount
   useEffect(() => {
@@ -46,10 +55,31 @@ export function DriverProvider({ children }: { children: React.ReactNode }) {
 
       const handleRideRequest = (data: any) => {
         // Server sends ride data directly or wrapped in { ride }
-        const ride = data.ride || data;
-        setIncomingRequest(ride as Ride);
-        // Sound + vibration alert
+        const ride = (data.ride || data) as Ride;
+        // Dedup — ignore if already queued or already the active ride
+        setAvailableRides((prev) => {
+          if (prev.some((r) => r.id === ride.id)) return prev;
+          return [...prev, ride];
+        });
+        // Sound + vibration alert only for the first new arrival
         alertRideRequest();
+      };
+
+      // Broadcast dispatch: a new ride is up for grabs for ALL online drivers
+      const handleRideAvailable = (data: any) => {
+        const ride = (data.ride || data) as Ride;
+        setAvailableRides((prev) => {
+          if (prev.some((r) => r.id === ride.id)) return prev;
+          return [...prev, ride];
+        });
+        alertRideRequest();
+      };
+
+      // Another driver accepted / it got cancelled — drop it from the list
+      const handleRideUnavailable = (data: any) => {
+        const rideId = data.ride_id || data.rideId;
+        if (!rideId) return;
+        setAvailableRides((prev) => prev.filter((r) => r.id !== rideId));
       };
 
       const handleStatusChange = (data: any) => {
@@ -80,11 +110,15 @@ export function DriverProvider({ children }: { children: React.ReactNode }) {
       };
 
       socket.on("ride:request", handleRideRequest);
+      socket.on("ride:available", handleRideAvailable);
+      socket.on("ride:unavailable", handleRideUnavailable);
       socket.on("ride:status", handleStatusChange);
       socket.on("driver:status", handleDriverStatus);
 
       return () => {
         socket.off("ride:request", handleRideRequest);
+        socket.off("ride:available", handleRideAvailable);
+        socket.off("ride:unavailable", handleRideUnavailable);
         socket.off("ride:status", handleStatusChange);
         socket.off("driver:status", handleDriverStatus);
       };
@@ -126,6 +160,18 @@ export function DriverProvider({ children }: { children: React.ReactNode }) {
       // No active ride
     }
   };
+
+  const fetchAvailableRides = useCallback(async () => {
+    try {
+      const res = await api.get("/api/rides/available");
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) setAvailableRides(data as Ride[]);
+      }
+    } catch {
+      // Network error — keep whatever is already in the list
+    }
+  }, []);
 
   // GPS tracking — push location to server every 5s while online
   const startGpsTracking = useCallback(async () => {
@@ -172,12 +218,27 @@ export function DriverProvider({ children }: { children: React.ReactNode }) {
     return stopGpsTracking;
   }, [isOnline]);
 
+  // Whenever we (re)enter online state — including on app launch when the
+  // driver was already online from a previous session — refresh the list
+  // of available rides. This is also the recovery path if sockets lag.
+  useEffect(() => {
+    if (isOnline) fetchAvailableRides();
+  }, [isOnline, fetchAvailableRides]);
+
   const toggleOnline = async () => {
     const newStatus = isOnline ? "offline" : "available";
     const res = await api.patch("/api/drivers/status", { status: newStatus });
     if (res.ok) {
-      setIsOnline(!isOnline);
+      const goingOnline = !isOnline;
+      setIsOnline(goingOnline);
       setDriver((prev) => (prev ? { ...prev, status: newStatus } : null));
+      if (goingOnline) {
+        // Populate the feed with rides already pending before we went online
+        fetchAvailableRides();
+      } else {
+        // Drop the local queue — we shouldn't see anything while offline
+        setAvailableRides([]);
+      }
     } else {
       const err = await res.json();
       throw new Error(err.message || "Failed to update status");
@@ -191,16 +252,28 @@ export function DriverProvider({ children }: { children: React.ReactNode }) {
     if (res.ok) {
       const ride = await res.json();
       setActiveRide(ride);
-      setIncomingRequest(null);
+      // Clear the whole queue — we're on a ride now, nothing else is relevant.
+      // Other drivers will be told via ride:unavailable. If our acceptance
+      // raced with another driver and we lost, the ride won't be returned as
+      // status=accepted; the catch below handles that.
+      setAvailableRides([]);
       hapticSuccess();
     } else {
-      const err = await res.json();
+      const err = await res.json().catch(() => ({ message: "" }));
+      // Conflict = someone else accepted first. Remove it from our list and
+      // show a friendly message to the user.
+      if (res.status === 400 || res.status === 409) {
+        setAvailableRides((prev) => prev.filter((r) => r.id !== rideId));
+      }
       throw new Error(err.message || "Failed to accept ride");
     }
   };
 
-  const declineRide = () => {
-    setIncomingRequest(null);
+  const declineRide = (rideId?: string) => {
+    // Local-only — drop it from our list. Other drivers still see it.
+    const targetId = rideId || availableRides[0]?.id;
+    if (!targetId) return;
+    setAvailableRides((prev) => prev.filter((r) => r.id !== targetId));
   };
 
   const updateRideStatus = async (status: string, reason?: string) => {
@@ -232,10 +305,12 @@ export function DriverProvider({ children }: { children: React.ReactNode }) {
         driver,
         isOnline,
         activeRide,
+        availableRides,
         incomingRequest,
         toggleOnline,
         acceptRide,
         declineRide,
+        refreshAvailableRides: fetchAvailableRides,
         updateRideStatus,
         refreshActiveRide,
       }}

@@ -32,6 +32,13 @@ import {
   suggestIcon,
   type SavedPlace,
 } from "../services/savedPlaces";
+import {
+  listPaymentMethods,
+  formatMethodLabel,
+  iconForMethod,
+  type SavedPaymentMethod,
+} from "../services/paymentMethods";
+import PaymentMethodsScreen from "./PaymentMethodsScreen";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { MainTabParamList } from "../navigation/AppNavigator";
 
@@ -78,6 +85,10 @@ export default function HomeScreen({ navigation }: Props) {
   const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>([]);
   const [showSavePlace, setShowSavePlace] = useState(false);
   const [savePlaceLabel, setSavePlaceLabel] = useState("");
+  // Payment method selected for the next ride. null = default (or ad-hoc).
+  const [selectedMethod, setSelectedMethod] =
+    useState<SavedPaymentMethod | null>(null);
+  const [showMethodPicker, setShowMethodPicker] = useState(false);
   const [routeCoords, setRouteCoords] = useState<{ latitude: number; longitude: number }[]>([]);
   const [routeInfo, setRouteInfo] = useState<{ km: string; min: string } | null>(null);
   const [estimateLoading, setEstimateLoading] = useState(false);
@@ -115,6 +126,32 @@ export default function HomeScreen({ navigation }: Props) {
     useCallback(() => {
       reloadSavedPlaces();
     }, [reloadSavedPlaces])
+  );
+
+  // Keep the currently-selected payment method in sync with the server's
+  // default. Runs on focus so that changes made in the PaymentMethods screen
+  // are reflected immediately when returning here.
+  useFocusEffect(
+    useCallback(() => {
+      (async () => {
+        try {
+          const methods = await listPaymentMethods();
+          // If the user already picked a method and it still exists, keep it.
+          if (selectedMethod) {
+            const stillThere = methods.find((m) => m.id === selectedMethod.id);
+            if (stillThere) {
+              setSelectedMethod(stillThere);
+              return;
+            }
+          }
+          const def = methods.find((m) => m.is_default) || null;
+          setSelectedMethod(def);
+        } catch {
+          // Not authenticated yet or no Stripe config — silently ignore.
+        }
+      })();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
   );
 
   // Poll nearby available drivers every 15s while the user is on Home and
@@ -352,14 +389,15 @@ export default function HomeScreen({ navigation }: Props) {
       const rideId = data.ride?.id || data.id;
       const fare = data.fareBreakdown?.estimated_fare || data.ride?.fare_estimate;
 
-      // Skip payment in dev mode (Stripe requires native modules / EAS build)
-      if (__DEV__) {
-        navigateToTracking();
-      } else if (fare && Number(fare) > 0) {
+      // Rides are now created in `payment_pending` status. The server will
+      // only dispatch the ride once payment is authorized and we call
+      // /activate. If the ride has no fare (free?) or Stripe isn't wired in
+      // Expo Go, we activate immediately to keep the flow working.
+      if (fare && Number(fare) > 0) {
         setPendingRideId(rideId);
         setShowPayment(true);
       } else {
-        navigateToTracking();
+        await activateRideAndNavigate(rideId);
       }
     } catch (err: any) {
       Alert.alert(t("common.error"), err.message);
@@ -368,25 +406,53 @@ export default function HomeScreen({ navigation }: Props) {
     }
   };
 
-  const handlePaymentSuccess = () => {
-    setShowPayment(false);
-    setPendingRideId(null);
+  /**
+   * Flip the ride from payment_pending → pending server-side, then navigate.
+   * Defensive — if the webhook already activated it the server will return
+   * the row as-is (idempotent).
+   */
+  const activateRideAndNavigate = async (rideId: string) => {
+    try {
+      await api.post(`/api/rides/${rideId}/activate`, {});
+    } catch {
+      // Webhook may have already activated — navigate regardless. The
+      // tracking screen will reflect whatever state the server is in.
+    }
     navigateToTracking();
   };
 
-  const handlePaymentCancel = () => {
+  const handlePaymentSuccess = async () => {
+    const rideId = pendingRideId;
     setShowPayment(false);
-    // Ride is created but payment was cancelled — still navigate to tracking
-    // The user can pay later or the ride can be cancelled
+    setPendingRideId(null);
+    if (rideId) {
+      await activateRideAndNavigate(rideId);
+    } else {
+      navigateToTracking();
+    }
+  };
+
+  const handlePaymentCancel = async () => {
+    const rideId = pendingRideId;
+    setShowPayment(false);
+    setPendingRideId(null);
+
+    // Cancel the ride server-side so it doesn't sit in payment_pending and
+    // so the PaymentIntent hold (if any) is released on the same method.
+    if (rideId) {
+      try {
+        await api.patch(`/api/rides/${rideId}/status`, {
+          status: "cancelled",
+          cancellation_reason: "payment_cancelled_by_user",
+        });
+      } catch {
+        // Best-effort — server will eventually expire it anyway.
+      }
+    }
+
     Alert.alert(
       t("payment.cancelledTitle", "Pagamento annullato"),
-      t("payment.cancelledMessage", "Puoi completare il pagamento in seguito."),
-      [
-        {
-          text: t("common.ok", "OK"),
-          onPress: navigateToTracking,
-        },
-      ]
+      t("payment.cancelledMessage", "La corsa è stata annullata.")
     );
   };
 
@@ -677,6 +743,47 @@ export default function HomeScreen({ navigation }: Props) {
           </View>
         )}
 
+        {/* Payment method selector — tappable row showing current choice. */}
+        <TouchableOpacity
+          style={[
+            styles.methodSelector,
+            {
+              backgroundColor: colors.white,
+              borderColor: colors.border,
+            },
+          ]}
+          onPress={() => setShowMethodPicker(true)}
+          activeOpacity={0.7}
+        >
+          <View
+            style={[
+              styles.methodBubble,
+              { backgroundColor: colors.lightBg },
+            ]}
+          >
+            <Ionicons
+              name={
+                (selectedMethod
+                  ? iconForMethod(selectedMethod)
+                  : "card-outline") as any
+              }
+              size={20}
+              color={colors.primaryBlue}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.methodLabel, { color: colors.bodyText }]}>
+              {t("payment.methods.title", "Metodo di pagamento")}
+            </Text>
+            <Text style={[styles.methodValue, { color: colors.dark }]}>
+              {selectedMethod
+                ? formatMethodLabel(selectedMethod)
+                : t("payment.methods.payWithoutSaving", "Scegli al momento")}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.bodyText} />
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={[styles.bookButton, (loading || !pickup || !destination) && styles.bookButtonDisabled]}
           onPress={handleBookRide}
@@ -698,9 +805,41 @@ export default function HomeScreen({ navigation }: Props) {
             rideId={pendingRideId}
             onSuccess={handlePaymentSuccess}
             onCancel={handlePaymentCancel}
+            savedPaymentMethodId={selectedMethod?.id}
           />
         )}
       </View>
+
+      {/* Payment method picker modal */}
+      <Modal
+        visible={showMethodPicker}
+        animationType="slide"
+        onRequestClose={() => setShowMethodPicker(false)}
+      >
+        <View style={[styles.pickerHeader, { backgroundColor: colors.primaryBlue }]}>
+          <TouchableOpacity
+            onPress={() => setShowMethodPicker(false)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="close" size={26} color="#FFF" />
+          </TouchableOpacity>
+          <Text style={styles.pickerTitle}>
+            {t("payment.methods.title", "Metodo di pagamento")}
+          </Text>
+          <View style={{ width: 26 }} />
+        </View>
+        <PaymentMethodsScreen
+          onPick={(m) => {
+            setSelectedMethod(m);
+            setShowMethodPicker(false);
+          }}
+          allowAdHoc
+          onPickAdHoc={() => {
+            setSelectedMethod(null);
+            setShowMethodPicker(false);
+          }}
+        />
+      </Modal>
 
       {/* Save place modal */}
       <Modal
@@ -853,6 +992,33 @@ const styles = StyleSheet.create({
   },
   bookButtonDisabled: { opacity: 0.5 },
   bookButtonText: { fontSize: 18, fontWeight: "bold", color: "#FFF" },
+  methodSelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: spacing.sm + 2,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    marginTop: spacing.sm,
+    gap: spacing.sm,
+  },
+  methodBubble: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  methodLabel: { fontSize: 11, fontWeight: "500" },
+  methodValue: { fontSize: 14, fontWeight: "600", marginTop: 2 },
+  pickerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: 48,
+    paddingBottom: 16,
+    paddingHorizontal: spacing.md,
+  },
+  pickerTitle: { color: "#FFF", fontSize: 18, fontWeight: "bold" },
   dateTimeRow: {
     flexDirection: "row",
     gap: spacing.sm,

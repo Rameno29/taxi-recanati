@@ -18,19 +18,18 @@ function AppInner() {
   return <AppNavigator />;
 }
 
-// In production builds (EAS), wrap with StripeProvider.
-// In dev (Expo Go), Stripe native module isn't available, so skip it.
+// Wrap with StripeProvider whenever the native module is available.
+// In Expo Go the require() throws and we fall back to children only.
 function MaybeStripeProvider({ children }: { children: React.ReactNode }) {
-  if (__DEV__) {
-    return <>{children}</>;
-  }
-
-  // Dynamic import only in production to avoid crash in Expo Go
   try {
     const { StripeProvider } = require("@stripe/stripe-react-native");
     const { STRIPE_PUBLISHABLE_KEY } = require("./src/services/config");
     return (
-      <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
+      <StripeProvider
+        publishableKey={STRIPE_PUBLISHABLE_KEY}
+        merchantIdentifier="merchant.it.taxirecanati.customer"
+        urlScheme="taxirecanati"
+      >
         {children}
       </StripeProvider>
     );

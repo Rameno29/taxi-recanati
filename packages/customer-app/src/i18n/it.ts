@@ -105,11 +105,22 @@ export default {
     retry: "Riprova",
     cancelledTitle: "Pagamento annullato",
     cancelledMessage: "Puoi completare il pagamento in seguito.",
+    initError: "Errore nel pagamento",
+    methods: {
+      title: "Metodo di pagamento",
+      add: "Aggiungi metodo",
+      empty: "Nessun metodo salvato. Aggiungine uno per pagare più velocemente.",
+      default: "Predefinito",
+      deleteTitle: "Rimuovi metodo",
+      deleteConfirm: "Vuoi rimuovere {{label}}?",
+      payWithoutSaving: "Scegli al momento",
+    },
   },
   profile: {
     title: "Profilo",
     language: "Lingua",
     italian: "Italiano",
     english: "English",
+    paymentMethods: "Metodi di pagamento",
   },
 };

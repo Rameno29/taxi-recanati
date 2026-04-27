@@ -34,10 +34,13 @@ export default function DashboardScreen({ navigation }: Props) {
     isOnline,
     toggleOnline,
     incomingRequest,
+    availableRides,
     acceptRide,
     declineRide,
     activeRide,
   } = useDriver();
+
+  const moreAvailable = Math.max(0, availableRides.length - 1);
 
   // Slide-up animation for incoming request card
   const slideAnim = useRef(new Animated.Value(400)).current;
@@ -140,6 +143,11 @@ export default function DashboardScreen({ navigation }: Props) {
           <View style={styles.requestHeader}>
             <Ionicons name="notifications" size={24} color={colors.accentCoral} />
             <Text style={[styles.requestTitle, { color: colors.dark }]}>{t("dashboard.newRequest")}</Text>
+            {moreAvailable > 0 && (
+              <View style={[styles.moreBadge, { backgroundColor: colors.accentCoral }]}>
+                <Text style={styles.moreBadgeText}>+{moreAvailable}</Text>
+              </View>
+            )}
           </View>
 
           <View style={[styles.requestDetails, { backgroundColor: colors.lightBg }]}>
@@ -187,7 +195,7 @@ export default function DashboardScreen({ navigation }: Props) {
           </View>
 
           <View style={styles.requestActions}>
-            <TouchableOpacity style={[styles.declineBtn, { backgroundColor: colors.white, borderColor: colors.error }]} onPress={declineRide} activeOpacity={0.8}>
+            <TouchableOpacity style={[styles.declineBtn, { backgroundColor: colors.white, borderColor: colors.error }]} onPress={() => declineRide()} activeOpacity={0.8}>
               <Ionicons name="close" size={20} color={colors.error} />
               <Text style={styles.declineBtnText}>{t("dashboard.decline")}</Text>
             </TouchableOpacity>
@@ -374,4 +382,13 @@ const styles = StyleSheet.create({
   },
   acceptBtnText: { color: "#FFF", fontWeight: "bold", fontSize: fonts.body },
   requestFare: { fontSize: 18, fontWeight: "bold", color: staticColors.primaryBlue },
+  moreBadge: {
+    marginLeft: spacing.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radii.pill,
+    minWidth: 24,
+    alignItems: "center",
+  },
+  moreBadgeText: { color: "#FFF", fontWeight: "bold", fontSize: fonts.caption },
 });

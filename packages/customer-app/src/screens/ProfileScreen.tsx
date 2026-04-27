@@ -7,15 +7,20 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { persistLanguage } from "../i18n";
 import { spacing, radii, shadows } from "../theme";
+import type { RootStackParamList } from "../navigation/AppNavigator";
 
 export default function ProfileScreen() {
   const { t, i18n } = useTranslation();
   const { user, logout } = useAuth();
   const { mode, setMode, isDark, colors } = useTheme();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const cycleTheme = () => {
     const next = mode === "system" ? "light" : mode === "light" ? "dark" : "system";
@@ -73,7 +78,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: spacing.md }}
+          style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}
           onPress={cycleTheme}
           activeOpacity={0.6}
         >
@@ -85,6 +90,18 @@ export default function ProfileScreen() {
             <Text style={{ fontSize: 16, color: colors.bodyText }}>{themeLabel}</Text>
             <Ionicons name="chevron-forward" size={18} color={colors.bodyText} />
           </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: spacing.md }}
+          onPress={() => navigation.navigate("PaymentMethods")}
+          activeOpacity={0.6}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+            <Ionicons name="card-outline" size={22} color={colors.primaryBlue} />
+            <Text style={{ fontSize: 16, color: colors.dark }}>{t("profile.paymentMethods", "Metodi di pagamento")}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.bodyText} />
         </TouchableOpacity>
       </View>
 

@@ -103,6 +103,16 @@ router.get("/active", async (req: Request, res: Response, next: NextFunction) =>
   }
 });
 
+/** GET /api/rides/available — rides currently waiting for a driver (driver only) */
+router.get("/available", requireRole("driver"), async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const rides = await rideService.getAvailableRides();
+    res.json(rides);
+  } catch (err) {
+    next(err);
+  }
+});
+
 /** GET /api/rides/history — paginated ride history */
 router.get("/history", async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -163,9 +173,17 @@ router.patch("/:id/status", async (req: Request, res: Response, next: NextFuncti
         throw new AppError(403, "Customers can only cancel rides");
       }
     } else if (role === "driver") {
-      // Drivers can only update rides assigned to them
+      // Drivers can:
+      //   - accept any unassigned `pending` ride (first-come-first-served
+      //     broadcast dispatch — driver_id is still null at this point)
+      //   - update only rides already assigned to them for all other
+      //     transitions (arriving, in_progress, completed, cancelled, …)
+      const isAccepting =
+        data.status === "accepted" &&
+        existingRide.status === "pending" &&
+        !existingRide.driver_id;
       const isAssignedDriver = existingRide.driver_user_id === userId;
-      if (!isAssignedDriver) {
+      if (!isAccepting && !isAssignedDriver) {
         throw new AppError(403, "Not authorized to update this ride");
       }
     }
@@ -190,6 +208,25 @@ router.patch("/:id/status", async (req: Request, res: Response, next: NextFuncti
     next(err);
   }
 });
+
+/** POST /api/rides/:id/activate — transition ride from payment_pending → pending
+ *  after the customer's PaymentIntent has been authorized. Idempotent. */
+router.post(
+  "/:id/activate",
+  requireRole("customer"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await rideService.activateRide(
+        req.params.id as string,
+        req.user!.userId
+      );
+      res.json(result);
+    } catch (err) {
+      if (err instanceof AppError) return next(err);
+      next(err);
+    }
+  }
+);
 
 /** POST /api/rides/:id/rate — rate a completed ride (customer only) */
 router.post("/:id/rate", requireRole("customer"), async (req: Request, res: Response, next: NextFunction) => {

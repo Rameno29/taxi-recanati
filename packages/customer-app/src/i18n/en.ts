@@ -105,11 +105,22 @@ export default {
     retry: "Retry",
     cancelledTitle: "Payment cancelled",
     cancelledMessage: "You can complete the payment later.",
+    initError: "Payment error",
+    methods: {
+      title: "Payment method",
+      add: "Add method",
+      empty: "No saved methods yet. Add one to pay faster next time.",
+      default: "Default",
+      deleteTitle: "Remove method",
+      deleteConfirm: "Remove {{label}}?",
+      payWithoutSaving: "Choose at checkout",
+    },
   },
   profile: {
     title: "Profile",
     language: "Language",
     italian: "Italiano",
     english: "English",
+    paymentMethods: "Payment methods",
   },
 };

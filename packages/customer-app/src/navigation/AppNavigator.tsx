@@ -16,6 +16,7 @@ import TrackingScreen from "../screens/TrackingScreen";
 import ChatScreen from "../screens/ChatScreen";
 import HistoryScreen from "../screens/HistoryScreen";
 import ProfileScreen from "../screens/ProfileScreen";
+import PaymentMethodsScreen from "../screens/PaymentMethodsScreen";
 
 export type AuthStackParamList = {
   Login: undefined;
@@ -32,6 +33,7 @@ export type MainTabParamList = {
 export type RootStackParamList = {
   MainTabs: undefined;
   Chat: { rideId: string };
+  PaymentMethods: undefined;
 };
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -117,6 +119,16 @@ function MainNavigator() {
         component={ChatScreen}
         options={{
           title: "Chat",
+          headerStyle: { backgroundColor: colors.primaryBlue },
+          headerTintColor: colors.white,
+          headerTitleStyle: { fontWeight: "bold" },
+        }}
+      />
+      <RootStack.Screen
+        name="PaymentMethods"
+        component={PaymentMethodsScreen}
+        options={{
+          title: "Metodi di pagamento",
           headerStyle: { backgroundColor: colors.primaryBlue },
           headerTintColor: colors.white,
           headerTitleStyle: { fontWeight: "bold" },

@@ -2,6 +2,7 @@ import { RideStatus, RideType, VehicleType } from "./db";
 
 /** Valid state transitions for rides */
 export const VALID_TRANSITIONS: Record<RideStatus, RideStatus[]> = {
+  payment_pending: ["pending", "cancelled", "expired"],
   pending: ["accepted", "cancelled", "expired"],
   accepted: ["arriving", "cancelled"],
   arriving: ["in_progress", "cancelled", "no_show"],

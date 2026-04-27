@@ -14,8 +14,8 @@ import {
   checkFixedRoute,
 } from "./pricing.service";
 import { runAutoDispatch } from "./dispatch.service";
-import { broadcastRideStatus, broadcastDriverStatus } from "../handlers/ride.handler";
-import { capturePayment } from "./payment.service";
+import { broadcastRideStatus, broadcastDriverStatus, broadcastRideUnavailable } from "../handlers/ride.handler";
+import { capturePayment, cancelAuthorizedPayment } from "./payment.service";
 
 // Approximate distance using Haversine formula (for estimates without Google Maps API)
 function haversineDistance(
@@ -75,6 +75,10 @@ export async function createRide(customerId: string, input: RideCreateInput) {
     estimatedFare += Number(pricingRule.reservation_fee);
   }
 
+  // Rides start in "payment_pending" — dispatch is blocked until the
+  // customer's PaymentIntent reaches `requires_capture` and the client
+  // calls POST /api/rides/:id/activate. This prevents drivers from seeing
+  // (or accepting) rides that haven't been paid for yet.
   const [ride] = await db("rides")
     .insert({
       customer_id: customerId,
@@ -87,7 +91,7 @@ export async function createRide(customerId: string, input: RideCreateInput) {
       type: input.type,
       scheduled_at: input.scheduled_at || null,
       vehicle_type: input.vehicle_type,
-      status: "pending",
+      status: "payment_pending",
       dispatch_mode: "auto",
       fare_estimate: estimatedFare,
       distance_meters: Math.round(distanceMeters),
@@ -101,21 +105,85 @@ export async function createRide(customerId: string, input: RideCreateInput) {
   await db("ride_status_history").insert({
     ride_id: ride.id,
     old_status: null,
-    new_status: "pending",
+    new_status: "payment_pending",
     changed_by_user_id: customerId,
     changed_by_system: false,
   });
 
-  // Broadcast new ride to admin dashboard (real-time)
-  broadcastRideStatus(ride.id, null, "pending", ride);
+  // Broadcast to admin dashboard (so they can see pending-payment rides too)
+  broadcastRideStatus(ride.id, null, "payment_pending", ride);
 
-  // Auto-dispatch for immediate rides
+  // Dispatch happens later, from activateRide(), after payment authorization.
+  return { ride, fareBreakdown, dispatchResult: null };
+}
+
+/**
+ * Transition a ride from "payment_pending" to "pending" after the customer's
+ * PaymentIntent has been authorized. Runs auto-dispatch for immediate rides.
+ *
+ * Called by the client after the Stripe Payment Sheet confirms, or defensively
+ * by the `payment_intent.amount_capturable_updated` / `payment_intent.succeeded`
+ * webhook.
+ */
+export async function activateRide(rideId: string, customerId: string) {
+  // Perform the state transition in a transaction, then run dispatch OUTSIDE
+  // so that runAutoDispatch's fresh DB reads see the committed "pending" row.
+  const updated = await db.transaction(async (trx) => {
+    const ride = await trx("rides").where("id", rideId).forUpdate().first();
+    if (!ride) throw new AppError(404, "Ride not found");
+    if (ride.customer_id !== customerId) {
+      throw new AppError(403, "Not authorized to activate this ride");
+    }
+
+    // Idempotent — if already activated, return as-is
+    if (ride.status === "pending" || ride.status === "accepted") {
+      return ride;
+    }
+    if (ride.status !== "payment_pending") {
+      throw new AppError(
+        409,
+        `Cannot activate ride in '${ride.status}' status`
+      );
+    }
+
+    // Verify the ride has an authorized payment
+    const payment = await trx("payments")
+      .where("ride_id", rideId)
+      .whereIn("status", ["authorized", "captured"])
+      .first();
+    if (!payment) {
+      throw new AppError(
+        402,
+        "Il pagamento non è stato completato. Riprova."
+      );
+    }
+
+    const [row] = await trx("rides")
+      .where("id", rideId)
+      .update({ status: "pending" })
+      .returning("*");
+
+    await trx("ride_status_history").insert({
+      ride_id: rideId,
+      old_status: "payment_pending",
+      new_status: "pending",
+      changed_by_user_id: customerId,
+      changed_by_system: false,
+    });
+
+    return row;
+  });
+
+  // Only dispatch if we actually transitioned (not an idempotent re-call)
   let dispatchResult = null;
-  if (input.type === "immediate") {
-    dispatchResult = await runAutoDispatch(ride.id);
+  if (updated.status === "pending") {
+    broadcastRideStatus(rideId, "payment_pending", "pending", updated);
+    if (updated.type === "immediate") {
+      dispatchResult = await runAutoDispatch(rideId);
+    }
   }
 
-  return { ride, fareBreakdown, dispatchResult };
+  return { ride: updated, dispatchResult };
 }
 
 /**
@@ -225,6 +293,18 @@ export async function updateRideStatus(
     // Broadcast status change via Socket.io
     broadcastRideStatus(rideId, currentStatus, newStatus, updatedRide);
 
+    // If the ride is no longer available for pickup (accepted by another
+    // driver, or cancelled/expired while still pending), tell every online
+    // driver in `drivers:available` to drop it from their local list.
+    if (
+      currentStatus === "pending" &&
+      (newStatus === "accepted" ||
+        newStatus === "cancelled" ||
+        newStatus === "expired")
+    ) {
+      broadcastRideUnavailable(rideId, newStatus);
+    }
+
     // Auto-capture payment on ride completion (best-effort)
     if (newStatus === "completed") {
       try {
@@ -234,8 +314,73 @@ export async function updateRideStatus(
       }
     }
 
+    // On cancellation/expiry/no-show, release the pre-authorized hold on the
+    // customer's payment method. If the payment was already captured (e.g.
+    // a completed ride that was later marked as cancelled administratively)
+    // we leave it alone — use a refund for that case.
+    if (
+      newStatus === "cancelled" ||
+      newStatus === "expired" ||
+      newStatus === "no_show"
+    ) {
+      try {
+        await cancelAuthorizedPayment(rideId);
+      } catch {
+        // Payment cancel failed — log and continue; admin can handle via
+        // dashboard.
+      }
+    }
+
     return updatedRide;
   });
+}
+
+/**
+ * List rides currently available for a driver to accept — all rides in
+ * `pending` state with no driver yet. Used by:
+ *   - driver-app when toggling online (initial load)
+ *   - driver-app as fallback if socket reconnects and missed broadcasts
+ *
+ * Only returns rides that are immediate pickups (not scheduled reservations
+ * for future times that drivers can't accept yet).
+ */
+export async function getAvailableRides() {
+  const rows = await db("rides")
+    .where("status", "pending")
+    .whereNull("driver_id")
+    .orderBy("requested_at", "asc")
+    .select(
+      "id",
+      "pickup_lat",
+      "pickup_lng",
+      "pickup_address",
+      "destination_lat",
+      "destination_lng",
+      "destination_address",
+      "fare_estimate",
+      "distance_meters",
+      "duration_seconds",
+      "vehicle_type",
+      "type",
+      "requested_at"
+    );
+
+  return rows.map((r: any) => ({
+    id: r.id,
+    ride_id: r.id,
+    pickup_lat: Number(r.pickup_lat),
+    pickup_lng: Number(r.pickup_lng),
+    pickup_address: r.pickup_address,
+    destination_lat: Number(r.destination_lat),
+    destination_lng: Number(r.destination_lng),
+    destination_address: r.destination_address,
+    fare_estimate: Number(r.fare_estimate),
+    distance_meters: r.distance_meters,
+    duration_seconds: r.duration_seconds,
+    vehicle_type: r.vehicle_type,
+    type: r.type,
+    requested_at: r.requested_at,
+  }));
 }
 
 /**

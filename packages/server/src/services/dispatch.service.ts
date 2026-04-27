@@ -1,7 +1,11 @@
 import db from "../db";
 import type { DriverRow } from "../types/db";
 import { AppError } from "../middleware/errorHandler";
-import { sendRideRequest, broadcastRideStatus } from "../handlers/ride.handler";
+import {
+  sendRideRequest,
+  broadcastRideStatus,
+  broadcastRideAvailable,
+} from "../handlers/ride.handler";
 
 export interface NearestDriver extends DriverRow {
   distance_meters: number;
@@ -72,36 +76,45 @@ export async function attemptDispatch(
 }
 
 /**
- * Auto-dispatch: find nearest drivers and create the first dispatch attempt.
- * Sends ride:request to the driver via Socket.io.
+ * Auto-dispatch: broadcast the ride to every currently-online driver via the
+ * `drivers:available` socket room, first-come-first-served. Any online driver
+ * sees the request and the first one to accept wins (enforced by
+ * `SELECT FOR UPDATE` in rideService.updateRideStatus).
+ *
+ * The ride also goes into the "available feed" (served by GET
+ * /api/rides/available) so drivers that come online after the broadcast
+ * still see it.
  */
 export async function runAutoDispatch(rideId: string) {
   const ride = await db("rides").where("id", rideId).first();
   if (!ride || ride.status !== "pending") return null;
 
-  const drivers = await findNearestDrivers(
-    Number(ride.pickup_lat),
-    Number(ride.pickup_lng)
-  );
-
-  if (drivers.length === 0) return null;
-
-  const attempt = await attemptDispatch(rideId, drivers[0].id, 1, "system");
-
-  // Send ride request to driver via Socket.io
-  sendRideRequest(drivers[0].id, {
+  const payload = {
+    id: rideId,
     ride_id: rideId,
-    pickup_lat: ride.pickup_lat,
-    pickup_lng: ride.pickup_lng,
+    pickup_lat: Number(ride.pickup_lat),
+    pickup_lng: Number(ride.pickup_lng),
     pickup_address: ride.pickup_address,
-    destination_lat: ride.destination_lat,
-    destination_lng: ride.destination_lng,
+    destination_lat: Number(ride.destination_lat),
+    destination_lng: Number(ride.destination_lng),
     destination_address: ride.destination_address,
-    fare_estimate: ride.fare_estimate,
+    fare_estimate: Number(ride.fare_estimate),
+    distance_meters: ride.distance_meters,
+    duration_seconds: ride.duration_seconds,
     vehicle_type: ride.vehicle_type,
-  });
+    type: ride.type,
+  };
 
-  return { attempt, driver: drivers[0] };
+  // Broadcast to every online driver in the `drivers:available` room.
+  broadcastRideAvailable(payload);
+
+  // Also record the broadcast as an attempt row for audit, without pinning a
+  // specific driver (use a sentinel attempt_no of 1, no driver_id).
+  // NOTE: ride_dispatch_attempts.driver_id is NOT nullable, so we skip
+  // inserting a row at broadcast time. An attempt is recorded when a driver
+  // explicitly accepts (see ride.service updateRideStatus).
+
+  return { broadcast: true, payload };
 }
 
 /**

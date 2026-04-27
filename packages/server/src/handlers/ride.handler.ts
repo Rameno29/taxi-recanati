@@ -122,6 +122,47 @@ export function broadcastDriverStatus(
 }
 
 /**
+ * Broadcast a newly-available ride to every online driver in the
+ * `drivers:available` socket room. First-come-first-served — the first
+ * driver to accept wins (enforced by SELECT FOR UPDATE in ride.service
+ * updateRideStatus).
+ *
+ * Drivers who are offline / busy / paused are NOT in the room, so they
+ * don't get notified (respecting the "offline drivers get nothing" rule).
+ * Drivers coming online pick up existing pending rides via the
+ * GET /api/rides/available REST endpoint.
+ */
+export function broadcastRideAvailable(rideData: Record<string, unknown>) {
+  try {
+    const io = getIO();
+    io.to("drivers:available").emit("ride:available", {
+      ...rideData,
+      broadcast_at: new Date().toISOString(),
+    });
+  } catch {
+    // Socket.io not initialized — silently skip
+  }
+}
+
+/**
+ * Notify all online drivers that a previously-available ride is no longer
+ * available (accepted by another driver, cancelled, or expired). Drivers'
+ * UI should remove it from their list.
+ */
+export function broadcastRideUnavailable(rideId: string, reason: string) {
+  try {
+    const io = getIO();
+    io.to("drivers:available").emit("ride:unavailable", {
+      ride_id: rideId,
+      reason,
+      timestamp: new Date().toISOString(),
+    });
+  } catch {
+    // Socket.io not initialized — silently skip
+  }
+}
+
+/**
  * Send a ride request to a specific driver via their socket room.
  */
 export function sendRideRequest(

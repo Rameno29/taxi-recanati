@@ -36,6 +36,9 @@ export default function ChatScreen({ route }: Props) {
 
     const socket = getSocket();
     if (socket) {
+      // Ensure we're in the ride room so chat:message broadcasts reach us
+      socket.emit("join:ride", rideId);
+
       const handleNewMessage = (msg: Message) => {
         if (msg.ride_id === rideId) {
           setMessages((prev) => {
@@ -53,7 +56,7 @@ export default function ChatScreen({ route }: Props) {
 
   const loadMessages = async () => {
     try {
-      const res = await api.get(`/api/messages/ride/${rideId}`);
+      const res = await api.get(`/api/messages/${rideId}`);
       if (res.ok) {
         const data = await res.json();
         setMessages(data);
@@ -69,10 +72,13 @@ export default function ChatScreen({ route }: Props) {
     setText("");
 
     try {
-      const res = await api.post(`/api/messages/ride/${rideId}`, { body });
+      const res = await api.post(`/api/messages/${rideId}`, { body });
       if (res.ok) {
         const msg = await res.json();
-        setMessages((prev) => [...prev, msg]);
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
       }
     } catch {
       // Failed to send

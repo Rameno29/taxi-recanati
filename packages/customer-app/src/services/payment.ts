@@ -28,9 +28,13 @@ export interface PaymentStatus {
  * Returns the payment record including the client_secret needed by the PaymentSheet.
  */
 export async function createPaymentIntent(
-  rideId: string
-): Promise<PaymentIntent> {
-  const res = await api.post("/api/payments/create-intent", { rideId });
+  rideId: string,
+  savedPaymentMethodId?: string
+): Promise<PaymentIntent & { status_stripe?: string }> {
+  const body: { rideId: string; savedPaymentMethodId?: string } = { rideId };
+  if (savedPaymentMethodId) body.savedPaymentMethodId = savedPaymentMethodId;
+
+  const res = await api.post("/api/payments/create-intent", body);
 
   if (!res.ok) {
     const err = await res.json();

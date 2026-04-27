@@ -5,13 +5,13 @@ import {
   ActivityIndicator,
   StyleSheet,
   TouchableOpacity,
-  Alert,
 } from "react-native";
 import { useStripe } from "@stripe/stripe-react-native";
 import {
   createPaymentIntent,
   confirmPaymentOnServer,
 } from "../services/payment";
+import { createEphemeralKey } from "../services/paymentMethods";
 import { colors, spacing, radii } from "../theme";
 import { useTranslation } from "react-i18next";
 
@@ -19,12 +19,18 @@ interface PaymentSheetProps {
   rideId: string;
   onSuccess: () => void;
   onCancel: () => void;
+  /**
+   * Optional: if the user already chose a saved payment method, pay silently
+   * off_session without opening the Stripe Payment Sheet.
+   */
+  savedPaymentMethodId?: string;
 }
 
 export default function PaymentSheet({
   rideId,
   onSuccess,
   onCancel,
+  savedPaymentMethodId,
 }: PaymentSheetProps) {
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const { t } = useTranslation();
@@ -34,21 +40,55 @@ export default function PaymentSheet({
 
   useEffect(() => {
     initializePayment();
-  }, [rideId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rideId, savedPaymentMethodId]);
 
   async function initializePayment() {
     setLoading(true);
     setError(null);
 
     try {
-      // 1. Create the payment intent on the server
-      const payment = await createPaymentIntent(rideId);
+      // 1. Create the payment intent on the server.
+      // If savedPaymentMethodId is provided, the server confirms off_session
+      // and returns status_stripe === "requires_capture" immediately.
+      const payment = await createPaymentIntent(rideId, savedPaymentMethodId);
       setPaymentId(payment.id);
 
-      // 2. Initialize the Stripe PaymentSheet
+      // One-tap path: charge already authorised, nothing to show.
+      if (
+        savedPaymentMethodId &&
+        payment.status_stripe === "requires_capture"
+      ) {
+        onSuccess();
+        return;
+      }
+
+      // 2. Fetch an ephemeral key so the Payment Sheet can show saved methods.
+      // If this fails, continue without it (fallback to one-shot methods only).
+      let customerId: string | undefined;
+      let ephemeralKeySecret: string | undefined;
+      try {
+        const ek = await createEphemeralKey();
+        customerId = ek.customer;
+        ephemeralKeySecret = ek.ephemeralKey;
+      } catch {
+        // Non-fatal — saved methods just won't be visible this time.
+      }
+
+      // 3. Initialize the Stripe PaymentSheet with Apple Pay + Google Pay.
       const { error: initError } = await initPaymentSheet({
         paymentIntentClientSecret: payment.client_secret,
         merchantDisplayName: "Taxi Recanati",
+        customerId,
+        customerEphemeralKeySecret: ephemeralKeySecret,
+        applePay: { merchantCountryCode: "IT" },
+        googlePay: {
+          merchantCountryCode: "IT",
+          currencyCode: "EUR",
+          testEnv: __DEV__,
+        },
+        allowsDelayedPaymentMethods: true,
+        returnURL: "taxirecanati://stripe-redirect",
         style: "alwaysLight",
       });
 
@@ -60,10 +100,10 @@ export default function PaymentSheet({
 
       setLoading(false);
 
-      // 3. Immediately present the sheet once initialized
+      // 4. Immediately present the sheet once initialized.
       await openPaymentSheet(payment.id);
     } catch (err: any) {
-      setError(err.message || "Failed to initialize payment");
+      setError(err.message || t("payment.initError", "Errore nel pagamento"));
       setLoading(false);
     }
   }
@@ -80,7 +120,7 @@ export default function PaymentSheet({
       return;
     }
 
-    // Payment succeeded on the client — confirm authorization on server
+    // Payment succeeded on the client — confirm authorization on server.
     try {
       const id = pId || paymentId;
       if (id) {

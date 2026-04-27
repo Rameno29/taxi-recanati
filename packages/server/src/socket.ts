@@ -92,6 +92,20 @@ export function initializeSocket(httpServer: HttpServer): Server {
 
     if (role === "driver" && socket.driverId) {
       socket.join(`driver:${socket.driverId}`);
+
+      // If the driver is currently `available`, put them in the broadcast
+      // room so they see new ride requests as they come in.
+      try {
+        const driver = await db("drivers")
+          .where("id", socket.driverId)
+          .select("status")
+          .first();
+        if (driver?.status === "available") {
+          socket.join("drivers:available");
+        }
+      } catch {
+        // DB error — skip
+      }
     }
 
     // Join active ride room (if they already have one)
@@ -170,6 +184,25 @@ export function getIO(): Server {
     throw new Error("Socket.io not initialized");
   }
   return io;
+}
+
+/**
+ * Add/remove a driver's currently-connected sockets from the
+ * `drivers:available` broadcast room. Called by driver.service when the
+ * driver toggles status online ↔ offline/paused/busy.
+ */
+export async function setDriverAvailableRoom(userId: string, shouldJoin: boolean) {
+  try {
+    if (!io) return;
+    const room = `user:${userId}`;
+    if (shouldJoin) {
+      await io.in(room).socketsJoin("drivers:available");
+    } else {
+      await io.in(room).socketsLeave("drivers:available");
+    }
+  } catch {
+    // Socket.io not initialized or no sockets — silently skip
+  }
 }
 
 export type { AuthenticatedSocket };

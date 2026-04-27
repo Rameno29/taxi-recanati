@@ -1,6 +1,7 @@
 import db from "../db";
 import { AppError } from "../middleware/errorHandler";
 import { broadcastDriverStatus } from "../handlers/ride.handler";
+import { setDriverAvailableRoom } from "../socket";
 import type { DriverStatus } from "../types/db";
 
 /**
@@ -54,6 +55,10 @@ export async function updateDriverStatus(userId: string, status: DriverStatus) {
     .where("id", driver.id)
     .update({ status })
     .returning("*");
+
+  // Add/remove the driver's socket(s) from the `drivers:available` broadcast
+  // room so they start/stop receiving incoming ride broadcasts.
+  await setDriverAvailableRoom(userId, status === "available");
 
   // Broadcast status change to admin dashboard and driver's own socket
   broadcastDriverStatus(driver.id, userId, status, {
